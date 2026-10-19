@@ -1,0 +1,4 @@
+V100 16 GiB allocator-cap test (torch.cuda.set_per_process_memory_fraction(0.5) on the 32 GiB card)
+workload: flash_attn_varlen_func fwd+bwd, packed varlen T=262144 (8 x 32768), H=32, H_k=8, D=128,
+          causal, fp16, torch 2.8.0+cu128, Tesla V100S-PCIE-32GB
+result:   OK, peak 13376 MiB, 14.4 s, out (262144, 32, 128)

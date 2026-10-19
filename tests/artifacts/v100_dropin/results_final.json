@@ -1,0 +1,136 @@
+{
+ "rows": [
+  {
+   "case": "dense_gqa_fwd_bwd N=2048 H=32/HK=8 D=128",
+   "peak_alloc_mib": 104.5,
+   "peak_reserved_mib": 118.0,
+   "ms": 12.808
+  },
+  {
+   "case": "dense_gqa_fwd_bwd N=4096 H=32/HK=8 D=128",
+   "peak_alloc_mib": 209.0,
+   "peak_reserved_mib": 214.0,
+   "ms": 35.917
+  },
+  {
+   "case": "dense_gqa_fwd_bwd N=8192 H=32/HK=8 D=128",
+   "peak_alloc_mib": 418.0,
+   "peak_reserved_mib": 420.0,
+   "ms": 119.303
+  },
+  {
+   "case": "varlen_gqa_fwd_bwd T=8192 (4 seqs) H=32/HK=8 D=128",
+   "peak_alloc_mib": 418.0,
+   "peak_reserved_mib": 420.0,
+   "ms": 29.081
+  },
+  {
+   "case": "varlen_gqa_fwd_bwd T=16384 (4 seqs) H=32/HK=8 D=128",
+   "peak_alloc_mib": 836.0,
+   "peak_reserved_mib": 866.0,
+   "ms": 112.374
+  },
+  {
+   "case": "varlen_gqa_fwd_bwd T=32768 (4 seqs) H=32/HK=8 D=128",
+   "peak_alloc_mib": 1672.0,
+   "peak_reserved_mib": 1730.0,
+   "ms": 442.853
+  },
+  {
+   "case": "varlen_MHA_fwd_bwd T=16384 H=32 D=128",
+   "peak_alloc_mib": 1412.0,
+   "peak_reserved_mib": 1430.0,
+   "ms": 115.493
+  },
+  {
+   "case": "varlen_GQA(8)_fwd_bwd T=16384 H=32 D=128",
+   "peak_alloc_mib": 836.0,
+   "peak_reserved_mib": 866.0,
+   "ms": 112.664
+  },
+  {
+   "case": "dense_mha_fwd_bwd N=4096 H=32/HK=32 D=128",
+   "peak_alloc_mib": 353.0,
+   "peak_reserved_mib": 354.0,
+   "ms": 28.921
+  },
+  {
+   "case": "dense_mha_fwd_bwd_SDPA N=4096 H=32/HK=32 D=128",
+   "peak_alloc_mib": 417.0,
+   "peak_reserved_mib": 422.0,
+   "ms": 17.485
+  },
+  {
+   "case": "dense_mha_fwd_bwd N=8192 H=32/HK=32 D=128",
+   "peak_alloc_mib": 706.0,
+   "peak_reserved_mib": 708.0,
+   "ms": 112.736
+  },
+  {
+   "case": "dense_mha_fwd_bwd_SDPA N=8192 H=32/HK=32 D=128",
+   "peak_alloc_mib": 834.1,
+   "peak_reserved_mib": 838.0,
+   "ms": 68.587
+  },
+  {
+   "case": "dense_gqa_fwd_bwd_SDPA N=4096 H=32/HK=8 D=128",
+   "peak_alloc_mib": 385.0,
+   "peak_reserved_mib": 422.0,
+   "ms": 18.389
+  },
+  {
+   "case": "dense_gqa_fwd_bwd_SDPA N=8192 H=32/HK=8 D=128",
+   "peak_alloc_mib": 770.1,
+   "peak_reserved_mib": 838.0,
+   "ms": 69.552
+  },
+  {
+   "case": "padded_dense_SDPA B=4 N=4096 (tok=16384) H=32/HK=8 D=128",
+   "peak_alloc_mib": 1540.1,
+   "peak_reserved_mib": 1668.0,
+   "ms": 71.269
+  },
+  {
+   "case": "padded_dense_SDPA B=4 N=8192 (tok=32768) H=32/HK=8 D=128",
+   "peak_alloc_mib": 3080.2,
+   "peak_reserved_mib": 3332.0,
+   "ms": 283.778
+  },
+  {
+   "case": "prefill_fwd N=4096 H=32/HK=8 D=128",
+   "peak_alloc_mib": 112.0,
+   "peak_reserved_mib": 130.0,
+   "ms": 6.282
+  },
+  {
+   "case": "prefill_fwd N=8192 H=32/HK=8 D=128",
+   "peak_alloc_mib": 224.0,
+   "peak_reserved_mib": 258.0,
+   "ms": 23.913
+  },
+  {
+   "case": "prefill_fwd_SDPA N=4096 H=32/HK=8 D=128",
+   "peak_alloc_mib": 144.0,
+   "peak_reserved_mib": 160.0,
+   "ms": 3.907
+  },
+  {
+   "case": "prefill_fwd_SDPA N=8192 H=32/HK=8 D=128",
+   "peak_alloc_mib": 288.0,
+   "peak_reserved_mib": 320.0,
+   "ms": 14.845
+  },
+  {
+   "case": "kvcache_decode cache=4096 H=32/HK=8 D=128",
+   "peak_alloc_mib": 24.0,
+   "peak_reserved_mib": 42.0,
+   "ms": 0.366
+  },
+  {
+   "case": "kvcache_decode cache=8192 H=32/HK=8 D=128",
+   "peak_alloc_mib": 48.0,
+   "peak_reserved_mib": 50.0,
+   "ms": 0.595
+  }
+ ]
+}

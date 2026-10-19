@@ -20,8 +20,11 @@ newer GPUs, with no architecture suffix in the library or API.
 From the published wheel (built by this repository):
 
 ```bash
-pip install flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
+pip install https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
+# sha256: f0f6d69250db7ec8c5d1ec91c741654b3f5e557178352a59e629eca29d422795
 ```
+
+Release page: <https://github.com/mejistus/flash-attention-v100/releases/tag/v2.8.3>
 
 Then, exactly like the official package:
 
