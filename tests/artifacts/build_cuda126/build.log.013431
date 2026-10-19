@@ -1,0 +1,329 @@
+CUDA_HOME=/mnt/envs/v100/targets/x86_64-linux
+CC=/mnt/envs/v100/bin/x86_64-conda-linux-gnu-gcc
+MAX_JOBS=24 NVCC_THREADS=4
+Cuda compilation tools, release 12.6, V12.6.85
+Build cuda_12.6.r12.6/compiler.35059454_0
+torch 2.6.0+cu126 cuda 12.6
+Using Python 3.12.15 environment at: /mnt/envs/v100
+Resolved 1 package in 2ms
+   Building flash-attn-v100 @ file:///home/eculid/Documents/Github/flash-attention-v100
+  × Failed to build `flash-attn-v100 @
+  │ file:///home/eculid/Documents/Github/flash-attention-v100`
+  ├─▶ The build backend returned an error
+  ╰─▶ Call to `setuptools.build_meta.build_wheel` failed (exit status: 1)
+
+      [stdout]
+      running bdist_wheel
+      running build
+      running build_py
+      copying flash_attn_2_cuda.py -> build/lib.linux-x86_64-cpython-312
+      copying flash_attn_v100/flash_attn_interface.py ->
+      build/lib.linux-x86_64-cpython-312/flash_attn_v100
+      copying flash_attn_v100/_upstream_metadata.py ->
+      build/lib.linux-x86_64-cpython-312/flash_attn_v100
+      copying flash_attn_v100/__init__.py ->
+      build/lib.linux-x86_64-cpython-312/flash_attn_v100
+      running egg_info
+      writing flash_attn_v100.egg-info/PKG-INFO
+      writing dependency_links to flash_attn_v100.egg-info/dependency_links.txt
+      writing requirements to flash_attn_v100.egg-info/requires.txt
+      writing top-level names to flash_attn_v100.egg-info/top_level.txt
+      reading manifest file 'flash_attn_v100.egg-info/SOURCES.txt'
+      adding license file 'LICENSE'
+      adding license file 'AUTHORS'
+      writing manifest file 'flash_attn_v100.egg-info/SOURCES.txt'
+      Copied package:
+      /home/eculid/Documents/Github/flash-attention-v100/flash_attn ->
+      build/lib.linux-x86_64-cpython-312/flash_attn
+      running build_ext
+      Warning: no CUDA device detected at build time. Building without a GPU;
+      the extension will only run on machines with a Volta (sm_70) GPU.
+      building 'flash_attn_v100_cuda' extension
+      [1/2] /mnt/envs/v100/targets/x86_64-linux/bin/nvcc
+      --generate-dependencies-with-compile --dependency-output
+      /home/eculid/Documents/Github/flash-attention-v100/build/temp.linux-x86_64-cpython-312/kernel/forward_varlen.o.d
+      -I/home/eculid/Documents/Github/flash-attention-v100/include
+      -I/mnt/envs/v100/targets/x86_64-linux/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cublas/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_cupti/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_nvrtc/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_runtime/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cudnn/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cufft/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/curand/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cusolver/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cusparse/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nccl/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nvjitlink/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nvtx/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/torch/csrc/api/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/TH
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/THC
+      -I/mnt/envs/v100/targets/x86_64-linux/include
+      -I/mnt/envs/v100/include/python3.12 -c -c
+      /home/eculid/Documents/Github/flash-attention-v100/kernel/forward_varlen.cu
+      -o
+      /home/eculid/Documents/Github/flash-attention-v100/build/temp.linux-x86_64-cpython-312/kernel/forward_varlen.o
+      -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__
+      -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__
+      --expt-relaxed-constexpr --compiler-options
+      ''"'"'-fPIC'"'"'' -O3 -std=c++17 -gencode
+      arch=compute_70,code=sm_70 -U__CUDA_NO_HALF_OPERATORS__
+      -U__CUDA_NO_HALF_CONVERSIONS__ -U__CUDA_NO_HALF2_OPERATORS__
+      --expt-relaxed-constexpr --expt-extended-lambda
+      --use_fast_math -Wno-deprecated-gpu-targets --threads=4
+      -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"'
+      '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1016"'
+      -DTORCH_EXTENSION_NAME=flash_attn_v100_cuda -D_GLIBCXX_USE_CXX11_ABI=1
+      -ccbin /mnt/envs/v100/bin/x86_64-conda-linux-gnu-gcc
+      FAILED: [code=255]
+      /home/eculid/Documents/Github/flash-attention-v100/build/temp.linux-x86_64-cpython-312/kernel/forward_varlen.o
+      /mnt/envs/v100/targets/x86_64-linux/bin/nvcc
+      --generate-dependencies-with-compile --dependency-output
+      /home/eculid/Documents/Github/flash-attention-v100/build/temp.linux-x86_64-cpython-312/kernel/forward_varlen.o.d
+      -I/home/eculid/Documents/Github/flash-attention-v100/include
+      -I/mnt/envs/v100/targets/x86_64-linux/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cublas/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_cupti/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_nvrtc/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_runtime/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cudnn/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cufft/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/curand/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cusolver/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cusparse/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nccl/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nvjitlink/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nvtx/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/torch/csrc/api/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/TH
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/THC
+      -I/mnt/envs/v100/targets/x86_64-linux/include
+      -I/mnt/envs/v100/include/python3.12 -c -c
+      /home/eculid/Documents/Github/flash-attention-v100/kernel/forward_varlen.cu
+      -o
+      /home/eculid/Documents/Github/flash-attention-v100/build/temp.linux-x86_64-cpython-312/kernel/forward_varlen.o
+      -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__
+      -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__
+      --expt-relaxed-constexpr --compiler-options
+      ''"'"'-fPIC'"'"'' -O3 -std=c++17 -gencode
+      arch=compute_70,code=sm_70 -U__CUDA_NO_HALF_OPERATORS__
+      -U__CUDA_NO_HALF_CONVERSIONS__ -U__CUDA_NO_HALF2_OPERATORS__
+      --expt-relaxed-constexpr --expt-extended-lambda
+      --use_fast_math -Wno-deprecated-gpu-targets --threads=4
+      -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"'
+      '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1016"'
+      -DTORCH_EXTENSION_NAME=flash_attn_v100_cuda -D_GLIBCXX_USE_CXX11_ABI=1
+      -ccbin /mnt/envs/v100/bin/x86_64-conda-linux-gnu-gcc
+      /home/eculid/Documents/Github/flash-attention-v100/kernel/forward_varlen.cu(431):
+      error: identifier "cu_seqlens_k_ptr" is undefined
+                    const int tk_b = cu_seqlens_k_ptr[b + 1] -
+      cu_seqlens_k_ptr[b];
+                                     ^
+
+      /home/eculid/Documents/Github/flash-attention-v100/kernel/forward_varlen.cu(432):
+      error: identifier "seqused_k_ptr" is undefined
+                    const int used_b = seqused_k_ptr ? (seqused_k_ptr[b] <
+      tk_b ? seqused_k_ptr[b] : tk_b) : tk_b;
+                                       ^
+
+      /home/eculid/Documents/Github/flash-attention-v100/kernel/forward_varlen.cu(433):
+      error: identifier "leftpad_k_ptr" is undefined
+                    const int pad_b = leftpad_k_ptr ? leftpad_k_ptr[b] : 0;
+                                      ^
+
+      3 errors detected in the compilation of
+      "/home/eculid/Documents/Github/flash-attention-v100/kernel/forward_varlen.cu".
+      [2/2] /mnt/envs/v100/targets/x86_64-linux/bin/nvcc
+      --generate-dependencies-with-compile --dependency-output
+      /home/eculid/Documents/Github/flash-attention-v100/build/temp.linux-x86_64-cpython-312/kernel/forward_kvcache.o.d
+      -I/home/eculid/Documents/Github/flash-attention-v100/include
+      -I/mnt/envs/v100/targets/x86_64-linux/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cublas/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_cupti/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_nvrtc/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cuda_runtime/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cudnn/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cufft/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/curand/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cusolver/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/cusparse/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nccl/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nvjitlink/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/nvidia/nvtx/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/torch/csrc/api/include
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/TH
+      -I/mnt/envs/v100/lib/python3.12/site-packages/torch/include/THC
+      -I/mnt/envs/v100/targets/x86_64-linux/include
+      -I/mnt/envs/v100/include/python3.12 -c -c
+      /home/eculid/Documents/Github/flash-attention-v100/kernel/forward_kvcache.cu
+      -o
+      /home/eculid/Documents/Github/flash-attention-v100/build/temp.linux-x86_64-cpython-312/kernel/forward_kvcache.o
+      -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__
+      -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__
+      --expt-relaxed-constexpr --compiler-options
+      ''"'"'-fPIC'"'"'' -O3 -std=c++17 -gencode
+      arch=compute_70,code=sm_70 -U__CUDA_NO_HALF_OPERATORS__
+      -U__CUDA_NO_HALF_CONVERSIONS__ -U__CUDA_NO_HALF2_OPERATORS__
+      --expt-relaxed-constexpr --expt-extended-lambda
+      --use_fast_math -Wno-deprecated-gpu-targets --threads=4
+      -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"'
+      '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1016"'
+      -DTORCH_EXTENSION_NAME=flash_attn_v100_cuda -D_GLIBCXX_USE_CXX11_ABI=1
+      -ccbin /mnt/envs/v100/bin/x86_64-conda-linux-gnu-gcc
+      ninja: build stopped: subcommand failed.
+
+      [stderr]
+      No ROCm runtime is found, using ROCM_HOME='/opt/rocm'
+      No CUDA runtime is found, using
+      CUDA_HOME='/mnt/envs/v100/targets/x86_64-linux'
+      /mnt/envs/v100/lib/python3.12/site-packages/setuptools/dist.py:332:
+      InformationOnly: Normalizing '26.06' to '26.6'
+        self.metadata.version = self._normalize_version(self.metadata.version)
+      /mnt/envs/v100/lib/python3.12/site-packages/torch/utils/cpp_extension.py:458:
+      UserWarning: There are no /mnt/envs/v100/bin/x86_64-conda-linux-gnu-g++
+      version bounds defined for CUDA version 12.6
+        warnings.warn(f'There are no {compiler_name} version bounds defined
+      for CUDA version {cuda_str_version}')
+      Emitting ninja build file
+      /home/eculid/Documents/Github/flash-attention-v100/build/temp.linux-x86_64-cpython-312/build.ninja...
+      Compiling objects...
+      Using envvar MAX_JOBS (24) as the number of workers...
+      Traceback (most recent call last):
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/torch/utils/cpp_extension.py",
+      line 2209, in _run_ninja_build
+          subprocess.run(
+        File "/mnt/envs/v100/lib/python3.12/subprocess.py", line 571, in run
+          raise CalledProcessError(retcode, process.args,
+      subprocess.CalledProcessError: Command '['ninja', '-v', '-j', '24']'
+      returned non-zero exit status 255.
+
+      The above exception was the direct cause of the following exception:
+
+      Traceback (most recent call last):
+        File "<string>", line 11, in <module>
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/build_meta.py",
+      line 438, in build_wheel
+          return _build(['bdist_wheel'])
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/build_meta.py",
+      line 429, in _build
+          return self._build_with_temp_dir(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/build_meta.py",
+      line 410, in _build_with_temp_dir
+          self.run_setup()
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/build_meta.py",
+      line 317, in run_setup
+          exec(code, locals())
+        File "<string>", line 215, in <module>
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/__init__.py",
+      line 117, in setup
+          return distutils.core.setup(**attrs)  # type: ignore[return-value]
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/core.py",
+      line 186, in setup
+          return run_commands(dist)
+                 ^^^^^^^^^^^^^^^^^^
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/core.py",
+      line 202, in run_commands
+          dist.run_commands()
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/dist.py",
+      line 1000, in run_commands
+          self.run_command(cmd)
+        File "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/dist.py",
+      line 1107, in run_command
+          super().run_command(command)
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/dist.py",
+      line 1019, in run_command
+          cmd_obj.run()
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/command/bdist_wheel.py",
+      line 370, in run
+          self.run_command("build")
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/cmd.py",
+      line 341, in run_command
+          self.distribution.run_command(command)
+        File "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/dist.py",
+      line 1107, in run_command
+          super().run_command(command)
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/dist.py",
+      line 1019, in run_command
+          cmd_obj.run()
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/command/build.py",
+      line 135, in run
+          self.run_command(cmd_name)
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/cmd.py",
+      line 341, in run_command
+          self.distribution.run_command(command)
+        File "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/dist.py",
+      line 1107, in run_command
+          super().run_command(command)
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/dist.py",
+      line 1019, in run_command
+          cmd_obj.run()
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/command/build_ext.py",
+      line 97, in run
+          _build_ext.run(self)
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/command/build_ext.py",
+      line 367, in run
+          self.build_extensions()
+        File "<string>", line 198, in build_extensions
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/torch/utils/cpp_extension.py",
+      line 900, in build_extensions
+          build_ext.build_extensions(self)
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/command/build_ext.py",
+      line 483, in build_extensions
+          self._build_extensions_serial()
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/command/build_ext.py",
+      line 509, in _build_extensions_serial
+          self.build_extension(ext)
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/command/build_ext.py",
+      line 262, in build_extension
+          _build_ext.build_extension(self, ext)
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/setuptools/_distutils/command/build_ext.py",
+      line 564, in build_extension
+          objects = self.compiler.compile(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/torch/utils/cpp_extension.py",
+      line 713, in unix_wrap_ninja_compile
+          _write_ninja_file_and_compile_objects(
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/torch/utils/cpp_extension.py",
+      line 1869, in _write_ninja_file_and_compile_objects
+          _run_ninja_build(
+        File
+      "/mnt/envs/v100/lib/python3.12/site-packages/torch/utils/cpp_extension.py",
+      line 2225, in _run_ninja_build
+          raise RuntimeError(message) from e
+      RuntimeError: Error compiling objects for extension
+
+
+hint: Build failures usually indicate a problem with the package or the build environment
+BUILD_EXIT=1

@@ -1,0 +1,3389 @@
+{
+ "upstream_version": "2.8.3",
+ "upstream_source": "PyPI sdist flash_attn-2.8.3.tar.gz",
+ "upstream_tarball_sha256": "1e71dd64a9e0280e0447b8a0c2541bad4bf6ac65bdeaa2f90e51a9e57de0370d",
+ "upstream_license": {
+  "spdx": "BSD-3-Clause",
+  "copyright": "Copyright (c) 2022, the respective contributors, as shown by the AUTHORS file.",
+  "reuse_note": "BSD-3 permits copying/adapting signatures & pure-python wrappers as long as the copyright notice + license text are retained; the fork already uses BSD-3-Clause and keeps upstream copyright headers in bert_padding.py."
+ },
+ "repo_snapshot": {
+  "git_head": "fdf8631",
+  "captured_local": "2026-10-19 15:02:06",
+  "files_sha256": {
+   "flash_attn/__init__.py": "7e45d3e0de4f49b6d171a22db4a86fdea28fa9d888b2b786f3ad886432905cef",
+   "flash_attn/flash_attn_interface.py": "19b76931d618b2ffcdc4a79693c94354eda9ee8f5fd157fcfe257242645499b9",
+   "flash_attn/bert_padding.py": "083092cce9b53e8e8ddc25094ee3271382f11be19169bbe54f03dbe7e4461f67",
+   "flash_attn_v100/__init__.py": "8a0eccb816d0add917ffc79fd475487bf2e2406832093442710eeddda1c489c6",
+   "flash_attn_v100/flash_attn_interface.py": "58ad85d79ddcd1665037fdad3f76b7ee1642c702854fcfd7e95481c5660b4789"
+  },
+  "note": "Working tree was being updated by the implementation agent during this analysis; the verdicts in this spec are pinned to these file hashes."
+ },
+ "scope": {
+  "core": "flash_attn/__init__.py + flash_attn/flash_attn_interface.py + flash_attn/bert_padding.py - the surface required for `import flash_attn` drop-in use",
+  "extended_optional": [
+   "flash_attn/layers/rotary.py",
+   "flash_attn/layers/patch_embed.py",
+   "flash_attn/losses/cross_entropy.py",
+   "flash_attn/ops/activations.py",
+   "flash_attn/ops/layer_norm.py",
+   "flash_attn/ops/rms_norm.py",
+   "flash_attn/ops/fused_dense.py",
+   "flash_attn/ops/triton/*",
+   "flash_attn/models/*",
+   "flash_attn/modules/*",
+   "flash_attn/utils/benchmark.py, utils/distributed.py, utils/torch.py",
+   "flash_attn/utils/testing.py",
+   "flash_attn/utils/generation.py, utils/pretrained.py, utils/library.py",
+   "flash_attn/cute/*",
+   "flash_attn/flash_attn_triton.py, flash_attn_triton_og.py, flash_attn_triton_amd/*",
+   "flash_attn/flash_blocksparse_attention.py, flash_blocksparse_attn_interface.py"
+  ],
+  "out_of_scope": [
+   "flash_attn.cute (Hopper/Blackwell cutlass DSL)",
+   "flash_attn_triton* (triton/ROCm)",
+   "flash_blocksparse* (FA1)",
+   "ops/layer_norm|rms_norm|fused_dense (separate compiled extensions)",
+   "models/* (HF model zoo)"
+  ]
+ },
+ "core_import_deps": {
+  "flash_attn/__init__.py": [
+   "flash_attn.flash_attn_interface (relative)",
+   "combined with pkgutil.extend_path in fork"
+  ],
+  "flash_attn/flash_attn_interface.py": [
+   "typing",
+   "torch",
+   "os",
+   "flash_attn_2_cuda (guarded by FLASH_ATTENTION_TRITON_AMD_ENABLE env)"
+  ],
+  "flash_attn/bert_padding.py": [
+   "torch",
+   "torch.nn.functional",
+   "einops"
+  ],
+  "note": "only einops (pure python) + torch are needed for core; einops is a declared dependency of upstream flash-attn 2.8.3."
+ },
+ "symbols": [
+  {
+   "name": "flash_attn_func",
+   "module": "flash_attn",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT). Return semantics now match upstream: return_softmax is only passed to the kernel when dropout_p > 0, while the user still gets the 3-tuple with an empty S_dmask (implemented 2026-10-19). Verify lse/dmask at runtime.",
+   "sig": "(q, k, v, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_kvpacked_func",
+   "module": "flash_attn",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT, 2026-10-19). Implemented (k,v = kv.unbind(2) -> flash_attn_func); shape guard (B,S,2,Hk,D); GQA via H % Hk == 0.",
+   "sig": "(q, kv, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "kv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_qkvpacked_func",
+   "module": "flash_attn",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "sig": "(qkv, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "qkv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_varlen_func",
+   "module": "flash_attn",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT). Keep delegation; verify block_table + return_attn_probs semantics at runtime.",
+   "sig": "(q, k, v, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False, block_table=None)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "block_table",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_varlen_kvpacked_func",
+   "module": "flash_attn",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT, 2026-10-19). Implemented (k,v = kv.unbind(1) -> flash_attn_varlen_func with separate cu_seqlens_q/cu_seqlens_k); shape guard (Tk,2,Hk,D).",
+   "sig": "(q, kv, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "kv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_varlen_qkvpacked_func",
+   "module": "flash_attn",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT, 2026-10-19). Implemented (qkv.unbind(1) -> flash_attn_varlen_func(q,k,v,cu_seqlens,cu_seqlens,max_seqlen,max_seqlen,...)); shape guard (T,3,H,D).",
+   "sig": "(qkv, cu_seqlens, max_seqlen, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "qkv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_with_kvcache",
+   "module": "flash_attn",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT kwargs). Verify runtime: int cache_seqlens expansion, cache_batch_idx/cache_leftpad/block_table, rotary_interleaved, num_splits, return_softmax_lse dtype/shape (B,H,S) fp32.",
+   "sig": "(q, k_cache, v_cache, k=None, v=None, rotary_cos=None, rotary_sin=None, cache_seqlens=None, cache_batch_idx=None, cache_leftpad=None, block_table=None, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, rotary_interleaved=True, alibi_slopes=None, num_splits=0, return_softmax_lse=False)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k_cache",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v_cache",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rotary_cos",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rotary_sin",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cache_seqlens",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cache_batch_idx",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cache_leftpad",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "block_table",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rotary_interleaved",
+     "default": "True",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "num_splits",
+     "default": "0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_softmax_lse",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "FlashAttnFunc",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "class",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, q, k, v, dropout_p, softmax_scale, causal, window_size, softcap, alibi_slopes, deterministic, return_softmax, is_grad_enabled)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "q",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "k",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "v",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dropout_p",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softmax_scale",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "causal",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "window_size",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softcap",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "alibi_slopes",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "deterministic",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "return_softmax",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "is_grad_enabled",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, dout, *args)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dout",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "args",
+       "default": null,
+       "kind": "var_positional"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "FlashAttnKVPackedFunc",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "class",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P2 port class (ctx + 12 args).",
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, q, kv, dropout_p, softmax_scale, causal, window_size, softcap, alibi_slopes, deterministic, return_softmax, is_grad_enabled)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "q",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "kv",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dropout_p",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softmax_scale",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "causal",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "window_size",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softcap",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "alibi_slopes",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "deterministic",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "return_softmax",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "is_grad_enabled",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, dout, *args)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dout",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "args",
+       "default": null,
+       "kind": "var_positional"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "FlashAttnQKVPackedFunc",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "class",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P2 port class or make it a thin autograd.Function built on the packed wrapper.",
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, qkv, dropout_p, softmax_scale, causal, window_size, softcap, alibi_slopes, deterministic, return_softmax, is_grad_enabled)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "qkv",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dropout_p",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softmax_scale",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "causal",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "window_size",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softcap",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "alibi_slopes",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "deterministic",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "return_softmax",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "is_grad_enabled",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, dout, *args)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dout",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "args",
+       "default": null,
+       "kind": "var_positional"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "FlashAttnVarlenFunc",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "class",
+   "required": true,
+   "repo_status": "SIG-MISMATCH",
+   "repo_detail": "forward: #15 return_softmax.name: 'return_softmax' vs 'return_attn_probs'",
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, q, k, v, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p, softmax_scale, causal, window_size, softcap, alibi_slopes, deterministic, return_softmax, block_table, is_grad_enabled)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "q",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "k",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "v",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "cu_seqlens_q",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "cu_seqlens_k",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "max_seqlen_q",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "max_seqlen_k",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dropout_p",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softmax_scale",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "causal",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "window_size",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softcap",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "alibi_slopes",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "deterministic",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "return_softmax",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "block_table",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "is_grad_enabled",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, dout, *args)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dout",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "args",
+       "default": null,
+       "kind": "var_positional"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "FlashAttnVarlenKVPackedFunc",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "class",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P2 port class (ctx + 15 args).",
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, q, kv, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p, softmax_scale, causal, window_size, softcap, alibi_slopes, deterministic, return_softmax, is_grad_enabled)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "q",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "kv",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "cu_seqlens_q",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "cu_seqlens_k",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "max_seqlen_q",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "max_seqlen_k",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dropout_p",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softmax_scale",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "causal",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "window_size",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softcap",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "alibi_slopes",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "deterministic",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "return_softmax",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "is_grad_enabled",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, dout, *args)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dout",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "args",
+       "default": null,
+       "kind": "var_positional"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "FlashAttnVarlenQKVPackedFunc",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "class",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P2 port class (ctx + 13 args).",
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, qkv, cu_seqlens, max_seqlen, dropout_p, softmax_scale, causal, window_size, softcap, alibi_slopes, deterministic, return_softmax, is_grad_enabled)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "qkv",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "cu_seqlens",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "max_seqlen",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dropout_p",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softmax_scale",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "causal",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "window_size",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "softcap",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "alibi_slopes",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "deterministic",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "return_softmax",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "is_grad_enabled",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, dout, *args)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "dout",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "args",
+       "default": null,
+       "kind": "var_positional"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "USE_TRITON_ROCM",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "assign",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P3 define USE_TRITON_ROCM = os.getenv('FLASH_ATTENTION_TRITON_AMD_ENABLE','FALSE') == 'TRUE' so upstream-style checks keep working.",
+   "value": "os.getenv('FLASH_ATTENTION_TRITON_AMD_ENABLE', 'FALSE') == 'TRUE'"
+  },
+  {
+   "name": "_flash_attn_backward",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "sig": "(dout, q, k, v, out, softmax_lse, dq, dk, dv, dropout_p, softmax_scale, causal, window_size_left, window_size_right, softcap, alibi_slopes, deterministic, rng_state=None) -> torch.Tensor",
+   "params": [
+    {
+     "name": "dout",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "out",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_lse",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dq",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dk",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_left",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_right",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rng_state",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_flash_attn_backward_fake",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P3 skip unless torch.compile parity required.",
+   "sig": "(dout, q, k, v, out, softmax_lse, dq, dk, dv, dropout_p, softmax_scale, causal, window_size_left, window_size_right, softcap, alibi_slopes, deterministic, rng_state=None) -> torch.Tensor",
+   "params": [
+    {
+     "name": "dout",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "out",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_lse",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dq",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dk",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_left",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_right",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rng_state",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_flash_attn_forward",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "sig": "(q, k, v, dropout_p, softmax_scale, causal, window_size_left, window_size_right, softcap, alibi_slopes, return_softmax) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_left",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_right",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_softmax",
+     "default": null,
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_flash_attn_forward_fake",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P3 only needed for torch.compile fake-tensor support; skip unless torch.compile parity required.",
+   "sig": "(q, k, v, dropout_p, softmax_scale, causal, window_size_left, window_size_right, softcap, alibi_slopes, return_softmax) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_left",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_right",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_softmax",
+     "default": null,
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_flash_attn_varlen_backward",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "sig": "(dout, q, k, v, out, softmax_lse, dq, dk, dv, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p, softmax_scale, causal, window_size_left, window_size_right, softcap, alibi_slopes, deterministic, rng_state=None, zero_tensors=False) -> torch.Tensor",
+   "params": [
+    {
+     "name": "dout",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "out",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_lse",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dq",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dk",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_left",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_right",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rng_state",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "zero_tensors",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_flash_attn_varlen_backward_fake",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P3 skip unless torch.compile parity required.",
+   "sig": "(dout, q, k, v, out, softmax_lse, dq, dk, dv, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p, softmax_scale, causal, window_size_left, window_size_right, softcap, alibi_slopes, deterministic, rng_state=None, zero_tensors=False) -> torch.Tensor",
+   "params": [
+    {
+     "name": "dout",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "out",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_lse",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dq",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dk",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_left",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_right",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rng_state",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "zero_tensors",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_flash_attn_varlen_forward",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P2 port with upstream defaults (window_size_left=-1, window_size_right=-1, softcap=0.0, alibi_slopes=None, return_softmax=False, block_table=None, leftpad_k=None, seqused_k=None, zero_tensors=False).",
+   "sig": "(q, k, v, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p, softmax_scale, causal, window_size_left=-1, window_size_right=-1, softcap=0.0, alibi_slopes=None, return_softmax=False, block_table=None, leftpad_k=None, seqused_k=None, zero_tensors=False) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_left",
+     "default": "-1",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_right",
+     "default": "-1",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_softmax",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "block_table",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "leftpad_k",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "seqused_k",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "zero_tensors",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_flash_attn_varlen_forward_fake",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P3 skip unless torch.compile parity required.",
+   "sig": "(q, k, v, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p, softmax_scale, causal, window_size_left=-1, window_size_right=-1, softcap=0.0, alibi_slopes=None, return_softmax=False, block_table=None, leftpad_k=None, seqused_k=None, zero_tensors=False) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_left",
+     "default": "-1",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size_right",
+     "default": "-1",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_softmax",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "block_table",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "leftpad_k",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "seqused_k",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "zero_tensors",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_get_block_size_n",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "P3 test/bench utility; copy or skip. Guarded by assert head_dim <= 256.",
+   "sig": "(device, head_dim, is_dropout, is_causal)",
+   "params": [
+    {
+     "name": "device",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "head_dim",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "is_dropout",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "is_causal",
+     "default": null,
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "_torch_custom_op_wrapper",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "assign",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "implement in fork (see detail).",
+   "value": "noop_custom_op_wrapper"
+  },
+  {
+   "name": "_torch_register_fake_wrapper",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "assign",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "implement in fork (see detail).",
+   "value": "noop_register_fake_wrapper"
+  },
+  {
+   "name": "_wrapped_flash_attn_backward",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "assign",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "implement in fork (see detail).",
+   "value": "_flash_attn_backward"
+  },
+  {
+   "name": "_wrapped_flash_attn_forward",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "assign",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "implement in fork (see detail).",
+   "value": "_flash_attn_forward"
+  },
+  {
+   "name": "_wrapped_flash_attn_varlen_backward",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "assign",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "implement in fork (see detail).",
+   "value": "_flash_attn_varlen_backward"
+  },
+  {
+   "name": "_wrapped_flash_attn_varlen_forward",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "assign",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "implement in fork (see detail).",
+   "value": "_flash_attn_varlen_forward"
+  },
+  {
+   "name": "flash_attn_func",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT). Return semantics now match upstream: return_softmax is only passed to the kernel when dropout_p > 0, while the user still gets the 3-tuple with an empty S_dmask (implemented 2026-10-19). Verify lse/dmask at runtime.",
+   "sig": "(q, k, v, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_gpu",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": ".flash_attn_triton_amd.interface_fa",
+   "kind": "external_import",
+   "required": false,
+   "repo_status": "EXACT",
+   "repo_detail": "alternative/conditional import; equivalent binding ['flash_attn_2_cuda']",
+   "imports": ".flash_attn_triton_amd.interface_fa"
+  },
+  {
+   "name": "flash_attn_kvpacked_func",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT, 2026-10-19). Implemented (k,v = kv.unbind(2) -> flash_attn_func); shape guard (B,S,2,Hk,D); GQA via H % Hk == 0.",
+   "sig": "(q, kv, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "kv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_qkvpacked_func",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "sig": "(qkv, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "qkv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_varlen_func",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT). Keep delegation; verify block_table + return_attn_probs semantics at runtime.",
+   "sig": "(q, k, v, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False, block_table=None)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "block_table",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_varlen_kvpacked_func",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT, 2026-10-19). Implemented (k,v = kv.unbind(1) -> flash_attn_varlen_func with separate cu_seqlens_q/cu_seqlens_k); shape guard (Tk,2,Hk,D).",
+   "sig": "(q, kv, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "kv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen_k",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_varlen_qkvpacked_func",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT, 2026-10-19). Implemented (qkv.unbind(1) -> flash_attn_varlen_func(q,k,v,cu_seqlens,cu_seqlens,max_seqlen,max_seqlen,...)); shape guard (T,3,H,D).",
+   "sig": "(qkv, cu_seqlens, max_seqlen, dropout_p=0.0, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, alibi_slopes=None, deterministic=False, return_attn_probs=False)",
+   "params": [
+    {
+     "name": "qkv",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cu_seqlens",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "max_seqlen",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "dropout_p",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "deterministic",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_attn_probs",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "flash_attn_with_kvcache",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT kwargs). Verify runtime: int cache_seqlens expansion, cache_batch_idx/cache_leftpad/block_table, rotary_interleaved, num_splits, return_softmax_lse dtype/shape (B,H,S) fp32.",
+   "sig": "(q, k_cache, v_cache, k=None, v=None, rotary_cos=None, rotary_sin=None, cache_seqlens=None, cache_batch_idx=None, cache_leftpad=None, block_table=None, softmax_scale=None, causal=False, window_size=(-1, -1), softcap=0.0, rotary_interleaved=True, alibi_slopes=None, num_splits=0, return_softmax_lse=False)",
+   "params": [
+    {
+     "name": "q",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k_cache",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v_cache",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "k",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "v",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rotary_cos",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rotary_sin",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cache_seqlens",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cache_batch_idx",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "cache_leftpad",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "block_table",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softmax_scale",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "causal",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "window_size",
+     "default": "(-1, -1)",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "softcap",
+     "default": "0.0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "rotary_interleaved",
+     "default": "True",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "alibi_slopes",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "num_splits",
+     "default": "0",
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "return_softmax_lse",
+     "default": "False",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "maybe_contiguous",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "sig": "(x)",
+   "params": [
+    {
+     "name": "x",
+     "default": null,
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "noop_custom_op_wrapper",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "implement in fork (see detail).",
+   "sig": "(name, fn=None, *, mutates_args, device_types=None, schema=None)",
+   "params": [
+    {
+     "name": "name",
+     "default": null,
+     "kind": "positional_only"
+    },
+    {
+     "name": "fn",
+     "default": "None",
+     "kind": "positional_only"
+    },
+    {
+     "name": "mutates_args",
+     "default": null,
+     "kind": "keyword_only"
+    },
+    {
+     "name": "device_types",
+     "default": "None",
+     "kind": "keyword_only"
+    },
+    {
+     "name": "schema",
+     "default": "None",
+     "kind": "keyword_only"
+    }
+   ]
+  },
+  {
+   "name": "noop_register_fake_wrapper",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "implement in fork (see detail).",
+   "sig": "(op, fn=None, *, lib=None, _stacklevel=1)",
+   "params": [
+    {
+     "name": "op",
+     "default": null,
+     "kind": "positional_only"
+    },
+    {
+     "name": "fn",
+     "default": "None",
+     "kind": "positional_only"
+    },
+    {
+     "name": "lib",
+     "default": "None",
+     "kind": "keyword_only"
+    },
+    {
+     "name": "_stacklevel",
+     "default": "1",
+     "kind": "keyword_only"
+    }
+   ]
+  },
+  {
+   "name": "round_multiple",
+   "module": "flash_attn.flash_attn_interface",
+   "defining_module": "flash_attn/flash_attn_interface.py",
+   "kind": "function",
+   "required": false,
+   "repo_status": "MISSING",
+   "repo_detail": null,
+   "recommendation": "v100 does not define it; 2-line pure-python helper \u2014 copy verbatim and add to the shim re-export list (P3 unless downstream imports it).",
+   "sig": "(x, m)",
+   "params": [
+    {
+     "name": "x",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "m",
+     "default": null,
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "IndexFirstAxis",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "class",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "no action (verified exact signature).",
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, input, indices)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "input",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "indices",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, grad_output)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "grad_output",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "IndexFirstAxisResidual",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "class",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "no action (verified exact signature).",
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, input, indices)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "input",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "indices",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, grad_output, grad_residual)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "grad_output",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "grad_residual",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "IndexPutFirstAxis",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "class",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "no action (verified exact signature).",
+   "bases": [
+    "torch.autograd.Function"
+   ],
+   "methods": {
+    "forward": {
+     "sig": "(ctx, values, indices, first_axis_dim)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "values",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "indices",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "first_axis_dim",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    },
+    "backward": {
+     "sig": "(ctx, grad_output)",
+     "params": [
+      {
+       "name": "ctx",
+       "default": null,
+       "kind": "positional_or_keyword"
+      },
+      {
+       "name": "grad_output",
+       "default": null,
+       "kind": "positional_or_keyword"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "index_first_axis",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "assign",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "no action (verified exact signature).",
+   "value": "IndexFirstAxis.apply"
+  },
+  {
+   "name": "index_first_axis_residual",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "assign",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "no action (verified exact signature).",
+   "value": "IndexFirstAxisResidual.apply"
+  },
+  {
+   "name": "index_put_first_axis",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "assign",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "no action (verified exact signature).",
+   "value": "IndexPutFirstAxis.apply"
+  },
+  {
+   "name": "pad_input",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT).",
+   "sig": "(hidden_states, indices, batch, seqlen)",
+   "params": [
+    {
+     "name": "hidden_states",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "indices",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "batch",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "seqlen",
+     "default": null,
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "unpad_input",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT, incl. 5-tuple return with used_seqlens_in_batch).",
+   "sig": "(hidden_states, attention_mask, unused_mask=None)",
+   "params": [
+    {
+     "name": "hidden_states",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "attention_mask",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "unused_mask",
+     "default": "None",
+     "kind": "positional_or_keyword"
+    }
+   ]
+  },
+  {
+   "name": "unpad_input_for_concatenated_sequences",
+   "module": "flash_attn.bert_padding",
+   "defining_module": "flash_attn/bert_padding.py",
+   "kind": "function",
+   "required": true,
+   "repo_status": "EXACT",
+   "repo_detail": null,
+   "recommendation": "DONE (EXACT, 4-tuple).",
+   "sig": "(hidden_states, attention_mask_in_length)",
+   "params": [
+    {
+     "name": "hidden_states",
+     "default": null,
+     "kind": "positional_or_keyword"
+    },
+    {
+     "name": "attention_mask_in_length",
+     "default": null,
+     "kind": "positional_or_keyword"
+    }
+   ]
+  }
+ ],
+ "repo_extras": [
+  {
+   "module": "flash_attn",
+   "kind": "assign",
+   "upstream_2083": "absent",
+   "risk": "flash_attn_gpu*: upstream has flash_attn_gpu as the CUDA extension module; fork aliases to flash_attn_func -> code doing flash_attn_gpu.fwd(...) breaks."
+  },
+  {
+   "module": "flash_attn",
+   "name": "flash_attn_gpu",
+   "kind": "assign",
+   "upstream_2083": "absent",
+   "risk": "flash_attn_gpu*: upstream has flash_attn_gpu as the CUDA extension module; fork aliases to flash_attn_func -> code doing flash_attn_gpu.fwd(...) breaks."
+  },
+  {
+   "module": "flash_attn",
+   "name": "flash_attn_varlen_gpu",
+   "kind": "assign",
+   "upstream_2083": "absent",
+   "risk": "flash_attn_gpu*: upstream has flash_attn_gpu as the CUDA extension module; fork aliases to flash_attn_func -> code doing flash_attn_gpu.fwd(...) breaks."
+  },
+  {
+   "module": "flash_attn",
+   "name": "flash_attn_with_kvcache_gpu",
+   "kind": "assign",
+   "upstream_2083": "absent",
+   "risk": "flash_attn_gpu*: upstream has flash_attn_gpu as the CUDA extension module; fork aliases to flash_attn_func -> code doing flash_attn_gpu.fwd(...) breaks."
+  },
+  {
+   "module": "flash_attn.flash_attn_interface",
+   "name": "flash_attn_varlen_gpu",
+   "kind": "assign",
+   "upstream_2083": "absent",
+   "risk": "flash_attn_gpu*: upstream has flash_attn_gpu as the CUDA extension module; fork aliases to flash_attn_func -> code doing flash_attn_gpu.fwd(...) breaks."
+  },
+  {
+   "module": "flash_attn.flash_attn_interface",
+   "name": "flash_attn_with_kvcache_gpu",
+   "kind": "assign",
+   "upstream_2083": "absent",
+   "risk": "flash_attn_gpu*: upstream has flash_attn_gpu as the CUDA extension module; fork aliases to flash_attn_func -> code doing flash_attn_gpu.fwd(...) breaks."
+  }
+ ],
+ "semantics_to_test": [
+  {
+   "id": "return_attn_probs_dropout0",
+   "severity": "P1",
+   "upstream": "flash_attn_func(..., return_attn_probs=True) with dropout_p=0 returns (out, softmax_lse, S_dmask) where S_dmask is a 0-element tensor (because upstream passes return_softmax and dropout_p>0 to the kernel) and softmax_lse is valid fp32.",
+   "recommendation": "runtime test (dense + varlen): 3-tuple shape, softmax_lse valid fp32, dmask.numel() == 0; this path previously raised RuntimeError."
+  },
+  {
+   "id": "head_dim_padding",
+   "severity": "P2",
+   "upstream": "python pads q/k/v head dim to a multiple of 8 before the kernel; kernel TORCH_CHECK head_size % 8 == 0 and head_size <= 256; no upper bound check in python (C++ rejects >256 with RuntimeError).",
+   "recommendation": "runtime test: 96/100/104/160/192/224 produce correct results (compare against a padded torch reference); >256 raises (ValueError vs upstream RuntimeError - consider aligning the error type)."
+  },
+  {
+   "id": "deterministic_true",
+   "severity": "P1",
+   "upstream": "deterministic=True is honored in backward (dq accumulation); no warning; unsupported shapes raise RuntimeError from C++.",
+   "recommendation": "document as accepted divergence (V100 kernels lack deterministic dq accumulation); consider not warning on upstream-default paths, or keep warning (type=RuntimeWarning) for transparency. Add to known-differences list."
+  },
+  {
+   "id": "contiguity",
+   "severity": "P3",
+   "upstream": "python maybe_contiguous only fixes stride(-1)!=1; C++ requires stride(-1)==1 and honors arbitrary strides otherwise (no full contiguity requirement for q/k/v in fwd/bwd).",
+   "fork_static": "fork permutes (B,S,H,D)->(B,H,S,D) and calls .contiguous() => also accepts arbitrary layouts, at the cost of a copy; results unchanged.",
+   "recommendation": "no action; note perf difference for strided inputs."
+  },
+  {
+   "id": "kvcache_int_seqlens_len",
+   "severity": "P3",
+   "upstream": "int cache_seqlens is expanded to torch.full((k_cache.shape[0],), ...).",
+   "fork_static": "fork expands to (q.shape[0],).",
+   "recommendation": "equivalent when q.shape[0] == k_cache.shape[0]; differs only for exotic cache_batch_idx usage; test if downstream relies on cache larger than batch."
+  },
+  {
+   "id": "empty_inputs",
+   "severity": "P3",
+   "upstream": "no empty-input special case in upstream python; behavior for B==0 / M==0 / total_tokens==0 would be handled (or not) inside C++/kernels - not statically verifiable here.",
+   "fork_static": "v100 python short-circuits (2026-10-19): dense returns zero-filled (B,M,H,D) out + fp32 (B,H,M) lse filled with +inf + 0-element dmask (when requested); varlen returns zeros_like(q) + fp32 (H,0) lse filled with +inf + 0-element dmask (when requested).",
+   "recommendation": "runtime test once a GPU is available (optional, low priority): empty batch/seqlen must not crash; shapes/dtypes follow the documented pattern."
+  },
+  {
+   "id": "dtype",
+   "severity": "P1",
+   "upstream": "C++ TORCH_CHECK fp16/bf16 only ('FlashAttention only support fp16 and bf16 data type'); q/k/v same dtype.",
+   "fork_static": "fork presumably keeps the same checks (verify in kernel).",
+   "recommendation": "runtime test: fp32 input raises (matching upstream error class), fp16/bf16 works, mixed dtypes raise."
+  },
+  {
+   "id": "lse_shapes",
+   "severity": "P1",
+   "upstream": "dense softmax_lse (B,H,S) fp32; varlen (H, sum(seqlens)) fp32 (unpadded).",
+   "fork_static": "dense forward returns lse_ from kernel; varlen returns (H,T) layout per C++ comment.",
+   "recommendation": "assert dtype/shape/contiguity at runtime for return_attn_probs and return_softmax_lse paths."
+  },
+  {
+   "id": "extension_module_names",
+   "severity": "P2",
+   "upstream": "flash_attn_2_cuda exposes fwd, bwd, varlen_fwd, varlen_bwd, fwd_kvcache (PYBIND11_MODULE, TORCH_EXTENSION_NAME=flash_attn_2_cuda).",
+   "recommendation": "raw-ext nit: upstream varlen_fwd takes 21 positional args; fork adds a 22nd (num_splits, no default) -> direct positional calls with 21 args fail, python-level API unaffected. Consider py::arg default for num_splits."
+  },
+  {
+   "id": "softcap",
+   "severity": "P2",
+   "upstream": "softcap > 0 disables dropout (C++ check) and works; softcap <= 0 deactivates.",
+   "fork_static": "fork carries softcap through python and C++ (window/softcap params present).",
+   "recommendation": "runtime test softcap>0 + dropout_p>0 raises like upstream."
+  },
+  {
+   "id": "window_size",
+   "severity": "P2",
+   "upstream": "window_size=(-1,-1) means infinite; window_size_left >= seqlen_k is normalized to -1 in C++.",
+   "fork_static": "fork forwards window_left/window_right to kernels.",
+   "recommendation": "runtime test sliding-window equivalence vs a torch reference on small shapes."
+  },
+  {
+   "id": "version_string",
+   "severity": "P3",
+   "upstream": "__version__ == '2.8.3'.",
+   "recommendation": "keep; version-sensitive downstream checks (packaging.version) pass."
+  },
+  {
+   "id": "dtype_fp16_only",
+   "severity": "P1 (capability gap, fundamental on Volta)",
+   "upstream": "C++ accepts fp16 and bf16 ('FlashAttention only support fp16 and bf16 data type'); q/k/v must share dtype.",
+   "fork_static": "kernel/forward.cu, backward.cu, forward_varlen.cu, forward_kvcache.cu: TORCH_CHECK(q.dtype() == torch::kFloat16, 'q must be fp16'); no bf16 code path anywhere in kernel/ or include/.",
+   "recommendation": "document as a known difference: bf16 inputs raise RuntimeError on V100 (hardware has no bf16). Downstream bf16 users are not drop-in; optionally add automatic fp16 cast in the shim behind an env flag (lossy, not parity) - do NOT silently cast."
+  },
+  {
+   "id": "head_dim_supported_set",
+   "severity": "resolved (was P1 capability gap)",
+   "upstream": "HEADDIM_SWITCH buckets {32,64,96,128,192,256}: any head_dim <= 256 accepted (python pads to a multiple of 8 first; C++ TORCH_CHECK 'head dimension at most 256'). e.g. 96,160,192,224,104 work.",
+   "fork_static": "RESOLVED (2026-10-19): python `_round_head_dim` maps any head dim <= 256 onto the fork's kernel set {16,32,64,128,256}; kernel dispatch unchanged. Previously 96/160/104/192/224 hit TORCH_CHECK 'Unsupported D'.",
+   "recommendation": "runtime test the previously failing dims (96,160,192,224,104) plus the >256 error path."
+  },
+  {
+   "id": "arch_check",
+   "severity": "P3 (by design)",
+   "upstream": "TORCH_CHECK(cc_major >= 8, 'FlashAttention only supports Ampere GPUs or newer.')",
+   "fork_static": "TORCH_CHECK(props->major == 7 && props->minor == 0, 'Kernel supports only Volta GPUs.')",
+   "recommendation": "intended divergence; tests must run on a V100."
+  },
+  {
+   "id": "kvcache_capability_limits",
+   "severity": "P3",
+   "upstream": "fwd_kvcache supports num_splits up to 128 (0 = auto heuristic), softcap combined with window/ALiBi, and cache_batch_idx together with block_table (all passed through to the kernel).",
+   "fork_static": "kernel/forward_kvcache.cu: TORCH_CHECK(num_splits <= 1); softcap + window / softcap + ALiBi raise; paged KV + cache_batch_idx raises.",
+   "recommendation": "document; runtime tests should assert fork behavior (errors) rather than upstream behavior for those combos."
+  }
+ ],
+ "extended_inventory": [
+  {
+   "path": "flash_attn/layers/rotary.py",
+   "import_deps": "triton (flash_attn.ops.triton.rotary), einops",
+   "pure_python_portable": false,
+   "recommendation": "P3 optional: pure-torch fallback already exists in-file (apply_rotary_emb_torch); porting means dropping the triton import and using the torch fallback. Needed by `from flash_attn.layers.rotary import RotaryEmbedding` users."
+  },
+  {
+   "path": "flash_attn/layers/patch_embed.py",
+   "import_deps": "einops, optional FusedDense (guarded)",
+   "pure_python_portable": true,
+   "recommendation": "P3 optional: pure python when FusedDense unavailable (guarded import); can add as-is."
+  },
+  {
+   "path": "flash_attn/losses/cross_entropy.py",
+   "import_deps": "triton",
+   "pure_python_portable": false,
+   "recommendation": "P4 skip: triton kernel; no V100 triton port."
+  },
+  {
+   "path": "flash_attn/ops/activations.py",
+   "import_deps": "torch only",
+   "pure_python_portable": true,
+   "recommendation": "P3 optional: pure python; trivial to include."
+  },
+  {
+   "path": "flash_attn/ops/layer_norm.py",
+   "import_deps": "dropout_layer_norm (separate compiled ext, not built by fork)",
+   "pure_python_portable": false,
+   "recommendation": "P4 skip unless the dropout_layer_norm extension is added to the build."
+  },
+  {
+   "path": "flash_attn/ops/rms_norm.py",
+   "import_deps": "dropout_layer_norm ext",
+   "pure_python_portable": false,
+   "recommendation": "P4 skip (same ext)."
+  },
+  {
+   "path": "flash_attn/ops/fused_dense.py",
+   "import_deps": "fused_dense_cuda ext + distributed",
+   "pure_python_portable": false,
+   "recommendation": "P4 skip (separate CUDA ext, not built by fork)."
+  },
+  {
+   "path": "flash_attn/ops/triton/*",
+   "import_deps": "triton",
+   "pure_python_portable": false,
+   "recommendation": "P4 skip."
+  },
+  {
+   "path": "flash_attn/models/*",
+   "import_deps": "transformers, einops, sentencepiece, json",
+   "pure_python_portable": false,
+   "recommendation": "P4 out of scope (model zoo, heavy deps; not needed for API drop-in)."
+  },
+  {
+   "path": "flash_attn/modules/*",
+   "import_deps": "torch, einops, optional apex/triton (guarded)",
+   "pure_python_portable": false,
+   "recommendation": "P4 out of scope (training blocks; guarded imports would degrade silently)."
+  },
+  {
+   "path": "flash_attn/utils/benchmark.py, utils/distributed.py, utils/torch.py",
+   "import_deps": "torch only",
+   "pure_python_portable": true,
+   "recommendation": "P3 optional: pure python."
+  },
+  {
+   "path": "flash_attn/utils/testing.py",
+   "import_deps": "einops (torch utils)",
+   "pure_python_portable": true,
+   "recommendation": "P4 optional: test helpers; einops dep."
+  },
+  {
+   "path": "flash_attn/utils/generation.py, utils/pretrained.py, utils/library.py",
+   "import_deps": "transformers/hf_hub guarded, torch.library",
+   "pure_python_portable": false,
+   "recommendation": "P4 optional: HF-ecosystem helpers."
+  },
+  {
+   "path": "flash_attn/cute/*",
+   "import_deps": "nvidia cutlass python DSL (cutlass/cute modules) - Hopper/Blackwell",
+   "pure_python_portable": false,
+   "recommendation": "P4 skip: not runnable on V100/sm70."
+  },
+  {
+   "path": "flash_attn/flash_attn_triton.py, flash_attn_triton_og.py, flash_attn_triton_amd/*",
+   "import_deps": "triton (ROCm-targeted)",
+   "pure_python_portable": false,
+   "recommendation": "P4 skip."
+  },
+  {
+   "path": "flash_attn/flash_blocksparse_attention.py, flash_blocksparse_attn_interface.py",
+   "import_deps": "hydra, flash_attn_cuda (FA1 blocksparse ext), einops",
+   "pure_python_portable": false,
+   "recommendation": "P4 skip: FA1-era blocksparse, unrelated to FA2 API."
+  }
+ ],
+ "stats": {
+  "upstream_symbols_compared": 50,
+  "unique_upstream_names": 43,
+  "exact": 26,
+  "missing": 23,
+  "mismatched": 1,
+  "required_total": 25,
+  "required_exact": 24,
+  "required_failing": [
+   "flash_attn.flash_attn_interface::FlashAttnVarlenFunc"
+  ],
+  "repo_extras": 6
+ },
+ "checker": {
+  "script": "/tmp/opencode/fa_upstream/parity_ast.py (stdlib-only AST checker; to be adapted into repo tests/)",
+  "exit_code": "0 iff every required symbol is EXACT"
+ }
+}

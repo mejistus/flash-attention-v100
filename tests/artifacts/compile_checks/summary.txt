@@ -1,0 +1,7 @@
+api.cpp EXIT=0
+forward.cu EXIT=0
+backward.cu EXIT=0
+backward_varlen.cu EXIT=0
+forward_varlen.cu EXIT=0
+forward_kvcache.cu EXIT=0
+ALL_DONE

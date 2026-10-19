@@ -1,0 +1,16 @@
+CUDA_HOME=/mnt/envs/v100/targets/x86_64-linux
+CC=/mnt/envs/v100/bin/x86_64-conda-linux-gnu-gcc
+MAX_JOBS=8 NVCC_THREADS=4
+Cuda compilation tools, release 12.6, V12.6.85
+Build cuda_12.6.r12.6/compiler.35059454_0
+torch 2.6.0+cu126 cuda 12.6
+Using Python 3.12.15 environment at: /mnt/envs/v100
+Resolved 1 package in 2ms
+   Building flash-attn-v100 @ file:///home/eculid/Documents/Github/flash-attention-v100
+  × Failed to build `flash-attn-v100 @
+  │ file:///home/eculid/Documents/Github/flash-attention-v100`
+  ├─▶ Failed to read metadata:
+  │   `/mnt/.cache/uv/builds-v0/.tmpucB1Ab/flash_attn_v100-26.6-cp312-cp312-linux_x86_64.whl`
+  ╰─▶ Multiple .dist-info directories found: flash_attn-2.8.3,
+      flash_attn_v100-26.6
+BUILD_EXIT=1

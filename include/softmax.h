@@ -92,14 +92,19 @@ __device__ __forceinline__ void WMMA_GEMM_SOFTMAX(
         new_max  =  fmaxf(SMEM_MAX[row],  thread_max);
         exp_diff = __expf(SMEM_MAX[row] - new_max);
 
+        // P1-2: fully-masked row (new_max == NEG_INF sentinel). exp(fmax(-1e30 - -1e30, -80))
+        // = exp(0) = 1 would make P all-ones -> Out = mean(V). Force P = 0 instead:
+        // sRowSum = 0 -> Out = 0 * rcp(fmax(0, 1e-24)) = 0, lse stays the NEG_INF sentinel.
+        const bool all_masked = (new_max == NEG_INF);
+
         #pragma unroll
         for (int idx = 0; idx < MAX_ITERS; ++idx) {
             const int addr = thread + idx * THREADS_PER_ROW;
             if (addr < cols) {
-                float e0 = __expf(fmaxf(sS[idx].x - new_max, -80.0f));
-                float e1 = __expf(fmaxf(sS[idx].y - new_max, -80.0f));
-                float e2 = __expf(fmaxf(sS[idx].z - new_max, -80.0f));
-                float e3 = __expf(fmaxf(sS[idx].w - new_max, -80.0f));
+                float e0 = all_masked ? 0.0f : __expf(fmaxf(sS[idx].x - new_max, -80.0f));
+                float e1 = all_masked ? 0.0f : __expf(fmaxf(sS[idx].y - new_max, -80.0f));
+                float e2 = all_masked ? 0.0f : __expf(fmaxf(sS[idx].z - new_max, -80.0f));
+                float e3 = all_masked ? 0.0f : __expf(fmaxf(sS[idx].w - new_max, -80.0f));
 
                 thread_sum += (e0 + e1) + (e2 + e3);
 
@@ -131,9 +136,24 @@ __device__ __forceinline__ void WMMA_GEMM_SOFTMAX(
                         ushort gmem1 = 0x3C00 | (k1 ? 0 : 0x8000);
                         ushort gmem2 = 0x3C00 | (k2 ? 0 : 0x8000);
                         ushort gmem3 = 0x3C00 | (k3 ? 0 : 0x8000);
-                        uint64_t gmem_addr = __cvta_generic_to_global(GMEM_MASK + row * STRIDE_GMEM_MASK + addr * 4);
-                        asm volatile("st.global.v4.u16 [%0], {%1, %2, %3, %4};\n"
-                                     :: "l"(gmem_addr), "h"(gmem0), "h"(gmem1), "h"(gmem2), "h"(gmem3) : "memory");
+                        __half* __restrict__ dmask_row = GMEM_MASK + row * STRIDE_GMEM_MASK + addr * 4;
+                        if ((STRIDE_GMEM_MASK & 3) == 0) {
+                            // G-2: aligned row stride -> 8B vector store is safe
+                            uint64_t gmem_addr = __cvta_generic_to_global(dmask_row);
+                            asm volatile("st.global.v4.u16 [%0], {%1, %2, %3, %4};\n"
+                                         :: "l"(gmem_addr), "h"(gmem0), "h"(gmem1), "h"(gmem2), "h"(gmem3) : "memory");
+                        } else {
+                            // G-2: STRIDE_GMEM_MASK % 4 != 0 -> row base is not 8B-aligned;
+                            // st.global.v4.u16 would fault -> four scalar 16-bit stores.
+                            uint64_t gmem_addr0 = __cvta_generic_to_global(dmask_row + 0);
+                            uint64_t gmem_addr1 = __cvta_generic_to_global(dmask_row + 1);
+                            uint64_t gmem_addr2 = __cvta_generic_to_global(dmask_row + 2);
+                            uint64_t gmem_addr3 = __cvta_generic_to_global(dmask_row + 3);
+                            asm volatile("st.global.u16 [%0], %1;\n" :: "l"(gmem_addr0), "h"(gmem0) : "memory");
+                            asm volatile("st.global.u16 [%0], %1;\n" :: "l"(gmem_addr1), "h"(gmem1) : "memory");
+                            asm volatile("st.global.u16 [%0], %1;\n" :: "l"(gmem_addr2), "h"(gmem2) : "memory");
+                            asm volatile("st.global.u16 [%0], %1;\n" :: "l"(gmem_addr3), "h"(gmem3) : "memory");
+                        }
                     }
                 }
                 st_half4(sP_base + addr * 8, __float22half2_rn(make_float2(e0, e1)), __float22half2_rn(make_float2(e2, e3)), row);
@@ -145,7 +165,7 @@ __device__ __forceinline__ void WMMA_GEMM_SOFTMAX(
             for (int idx = 0; idx < MAX_TAILS; ++idx) {
                 const int addr = tail + thread + idx * THREADS_PER_ROW;
                 if (addr < VALID_KV) {
-                    float e = __expf(fmaxf(sS_tail[idx] - new_max, -80.0f));
+                    float e = all_masked ? 0.0f : __expf(fmaxf(sS_tail[idx] - new_max, -80.0f));
                     thread_sum += e;
 
                     if constexpr (IS_DROPOUT) {
@@ -290,10 +310,19 @@ __device__ __forceinline__ void WMMA_GEMM_SOFTMAX_GRADIENT(
             const uint64_t addr_plx = static_cast<uint64_t>(GLOBAL_ROW_OFFSET + row) * GLOBAL_N + (GLOBAL_COL_OFFSET + col);
             const uint4         rng = init_philox(DROPOUT_SEED, DROPOUT_OFFSET + (addr_plx >> 2)).next();
 
-            if (in0) pd0 = (rng.x <= drop_thr) ? (p0 * rp_dropout) : 0.0f;
-            if (in1) pd1 = (rng.y <= drop_thr) ? (p1 * rp_dropout) : 0.0f;
-            if (in2) pd2 = (rng.z <= drop_thr) ? (p2 * rp_dropout) : 0.0f;
-            if (in3) pd3 = (rng.w <= drop_thr) ? (p3 * rp_dropout) : 0.0f;
+            // G-1: pick the philox word exactly like the forward path does
+            // (fwd: element k uses rng[(addr_plx + k) & 3]). Hardcoding x,y,z,w
+            // assumed addr_plx % 4 == 0, which is false whenever the row base
+            // (row_glob * GLOBAL_N) is not 4-aligned -> bwd applied a different
+            // dropout mask than fwd. c0 also covers the col part (col is 4-aligned
+            // in every DQ/DKV/DO block-size config, so only the row part matters).
+            const uint32_t c0 = static_cast<uint32_t>(addr_plx) & 3;
+            const uint32_t r[4] = {rng.x, rng.y, rng.z, rng.w};
+
+            if (in0) pd0 = (r[(c0 + 0) & 3] <= drop_thr) ? (p0 * rp_dropout) : 0.0f;
+            if (in1) pd1 = (r[(c0 + 1) & 3] <= drop_thr) ? (p1 * rp_dropout) : 0.0f;
+            if (in2) pd2 = (r[(c0 + 2) & 3] <= drop_thr) ? (p2 * rp_dropout) : 0.0f;
+            if (in3) pd3 = (r[(c0 + 3) & 3] <= drop_thr) ? (p3 * rp_dropout) : 0.0f;
         }
 
         float ds0 = __fmaf_rn(pd0, sdOV.x, -p0 * dot) * SOFTMAX_SCALE;

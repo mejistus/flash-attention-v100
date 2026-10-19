@@ -18,19 +18,25 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "FlashAttention implementation optimized for Volta";
     m.def("fwd",          &flash_attention_forward,        "FlashAttention Forward Pass");
     m.def("bwd",          &flash_attention_backward,       "FlashAttention Backward Pass");
-    m.def("varlen_fwd",   &flash_attention_varlen_forward, "FlashAttention Forward Pass (variable length)");
+    // NOTE: pybind11 requires annotations for ALL parameters once any py::arg is given
+    // (see pybind11 attr.h expected_num_args). num_splits mirrors the C++ default
+    // `int num_splits = 0` in kernel/forward_varlen.cu, so upstream-style 21-arg raw calls
+    // work; 22-arg calls (fork shim) keep working.
+    m.def("varlen_fwd",   &flash_attention_varlen_forward, "FlashAttention Forward Pass (variable length)",
+          py::arg("q"), py::arg("k"), py::arg("v"), py::arg("out"),
+          py::arg("cu_seqlens_q"), py::arg("cu_seqlens_k"),
+          py::arg("seqused_k"), py::arg("leftpad_k"), py::arg("block_table"),
+          py::arg("alibi_slopes"),
+          py::arg("max_seqlen_q"), py::arg("max_seqlen_k"),
+          py::arg("p_dropout"), py::arg("softmax_scale"),
+          py::arg("zero_tensors"), py::arg("is_causal"),
+          py::arg("window_size_left"), py::arg("window_size_right"), py::arg("softcap"),
+          py::arg("return_softmax"), py::arg("gen"),
+          py::arg("num_splits") = 0);
     m.def("varlen_bwd",   &flash_attention_varlen_backward,"FlashAttention Backward Pass (variable length)");
     m.def("fwd_kvcache",  &flash_attention_kvcache,        "Forward pass with KV-cache");
 }
 
-PYBIND11_MODULE(flash_attn_2_cuda, n) {
-    n.doc() = "FlashAttention-2 CUDA implementation";
-    n.def("fwd",          &flash_attention_forward,        "Forward pass");
-    n.def("bwd",          &flash_attention_backward,       "Backward pass");
-    n.def("varlen_fwd",   &flash_attention_varlen_forward, "Forward pass for variable-length sequences)");
-    n.def("varlen_bwd",   &flash_attention_varlen_backward,"Backward pass for variable-length sequences");
-    n.def("fwd_kvcache",  &flash_attention_kvcache,        "Forward pass with KV-cache for incremental decoding");
-}
 
 // ======================================================================================
 // TorchBind
@@ -305,7 +311,7 @@ std::vector<at::Tensor> torchbind_fwd_kvcache(
     );
 }
 
-TORCH_LIBRARY(flash_attn_v100, m) {
+TORCH_LIBRARY(flash_attn, m) {
     m.def(
         "fwd(Tensor(a!) q, Tensor k, Tensor v, "
         "Tensor? out, Tensor? alibi_slopes, "

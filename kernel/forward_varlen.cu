@@ -20,10 +20,116 @@
 #include "softmax.h"
 
 // ======================================================================================
+// PAGED KV SEGMENT LOADERS
+// A paged tile can span several physical pages: BLOCK_N (up to 512 for D=16) can exceed
+// block_page (>= 256). The tile is therefore loaded page by page:
+//   - WMMA_GEMM_LOAD_TILE_ROW_OFFSET loads one (page, offset) segment into tile rows
+//     [ROW_OFFSET, ROW_OFFSET + VALID_ROWS). Layout/asm are identical to
+//     WMMA_GEMM_LOAD_TILE, except the shared-memory swizzle uses the tile-global row
+//     index (ROW_OFFSET + row). The smem consumers (load_matrix_sync) apply the same
+//     swizzle per 16-row sub-tile, so the segments compose into one logical tile.
+//   - WMMA_GEMM_LOAD_PAGED_TILE walks the pages of the logical position range
+//     [start_pos, start_pos + valid_kv_rows). If a required page index is outside the
+//     block table, the remaining rows are left unwritten. Consumers only mask columns
+//     >= valid_kv_rows, so such rows are *stale shared memory*, NOT masked (no OOB
+//     access, but wrong values). The varlen host rejects under-sized tables
+//     (flash_attention_varlen_forward, research/11 R2); kvcache sizes the table from
+//     seqlen_k by construction. Keep the table large enough for seqlen_k + leftpad.
+// ======================================================================================
+template<typename Config, int SMEM_STRIDE, int GLOBAL_WIDTH>
+__device__ __forceinline__ void WMMA_GEMM_LOAD_TILE_ROW_OFFSET(
+    const __half* __restrict__ GMEM,
+          __half* __restrict__ SMEM,
+    int GLOBAL_STRIDE,
+    int ROW_OFFSET,
+    int VALID_ROWS,
+    int THREAD_ID
+) {
+    constexpr int THREADS_PER_BLOCK = Config::THREADS_PER_BLOCK;
+    constexpr int dst_stride_uint4  = (SMEM_STRIDE + 7) >> 3;
+    const     int wth_stride_uint4  = (((GLOBAL_WIDTH > 0) ? GLOBAL_WIDTH : GLOBAL_STRIDE) + 7) >> 3;
+    const     int src_stride_uint4  = (GLOBAL_STRIDE + 7) >> 3;
+
+    const     int total_iters       = VALID_ROWS * wth_stride_uint4;
+
+    if (total_iters == 0) return;
+
+    const uint64_t src_base = static_cast<uint64_t>(__cvta_generic_to_global(GMEM));
+    const uint32_t dst_base = static_cast<uint32_t>(__cvta_generic_to_shared(SMEM));
+
+    #pragma unroll 2
+    for (int idx = THREAD_ID; idx < total_iters; idx += THREADS_PER_BLOCK) {
+        const int row        = idx / wth_stride_uint4;
+        const int col        = idx % wth_stride_uint4;
+        const int global_row = ROW_OFFSET + row;
+
+        const int src_offset = row * src_stride_uint4 + col;
+        const int dst_offset = global_row * dst_stride_uint4 + col;
+
+        const int pred = (col < src_stride_uint4) ? 1 : 0;
+
+        uint64_t src_addr = src_base + (static_cast<uint64_t>(src_offset) << 4);
+        uint32_t dst_addr = swizzle(dst_base + (static_cast<uint32_t>(dst_offset) << 4), global_row);
+
+        uint32_t r0, r1, r2, r3;
+        asm volatile(
+            "{\n\t"
+            ".reg .pred p;\n\t"
+            "setp.ne.b32 p, %5, 0;\n\t"
+            "mov.u32 %0, 0;\n\t"
+            "mov.u32 %1, 0;\n\t"
+            "mov.u32 %2, 0;\n\t"
+            "mov.u32 %3, 0;\n\t"
+            "@p ld.global.v4.u32 {%0, %1, %2, %3}, [%4];\n\t"
+            "st.shared.v4.u32 [%6], {%0, %1, %2, %3};\n\t"
+            "}\n\t"
+            : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
+            : "l"(src_addr), "r"(pred), "r"(dst_addr)
+            : "memory"
+        );
+    }
+}
+
+template<typename Config, int SMEM_STRIDE, int GLOBAL_WIDTH>
+__device__ __forceinline__ void WMMA_GEMM_LOAD_PAGED_TILE(
+    const __half* __restrict__ BASE,
+    const int*    __restrict__ block_table,
+          __half* __restrict__ SMEM,
+    int start_pos,
+    int valid_kv_rows,
+    int block_page,
+    int block_table_stride,
+    int block_table_pages,
+    int batch_idx,
+    int kv_head_idx,
+    int kv_block_stride,
+    int global_stride,
+    int head_stride,
+    int THREAD_ID
+) {
+    const int page_idx    = start_pos / block_page;
+    const int page_offset = start_pos % block_page;
+    const int bt_idx      = batch_idx * block_table_stride + page_idx;
+
+    int rows_done = 0;
+    for (int seg = 0; rows_done < valid_kv_rows; ++seg) {
+        if (page_idx + seg >= block_table_pages) break;  // under-sized table: see header note (host rejects)
+        const int off_cur = (seg == 0) ? page_offset : 0;
+        const size_t kv_load = static_cast<size_t>(block_table[bt_idx + seg]) * kv_block_stride +
+                               static_cast<size_t>(off_cur) * global_stride +
+                               static_cast<size_t>(kv_head_idx) * head_stride;
+        const int rows_seg = min(valid_kv_rows - rows_done, block_page - off_cur);
+        WMMA_GEMM_LOAD_TILE_ROW_OFFSET<Config, SMEM_STRIDE, GLOBAL_WIDTH>(
+            BASE + kv_load, SMEM, global_stride, rows_done, rows_seg, THREAD_ID);
+        rows_done += rows_seg;
+    }
+}
+
+// ======================================================================================
 // FORWARD VARLEN KERNEL
 // ======================================================================================
 template<int D, bool IS_CAUSAL, bool IS_ALIBI, bool IS_SOFTCAP, bool IS_WINDOW, bool IS_DROPOUT, bool IS_PAGED>
-__global__ void __launch_bounds__(KernelConfig<D>::THREADS_PER_BLOCK, 2)
+__global__ void __launch_bounds__(KernelConfig<D>::THREADS_PER_BLOCK)
 flash_attention_forward_varlen_kernel(
     const __half* __restrict__ Q,
     const __half* __restrict__ K,
@@ -44,6 +150,7 @@ flash_attention_forward_varlen_kernel(
     const int      max_seqlen_k,
     const int      block_page,
     const int      block_table_stride,
+    const int      block_table_pages,
     const int      kv_block_stride,
     const float    softmax_scale,
     const float    softcap,
@@ -95,7 +202,8 @@ flash_attention_forward_varlen_kernel(
 
     // ======================================================================================
     // EARLY EXIT: No valid KV blocks to attend to (Causal/Window/Empty KV)
-    // Writes deterministic zeros to Out and NEG_INF to LSE for numerical stability.
+    // Writes deterministic zeros to Out and the upstream sentinel +inf to LSE
+    // (upstream: flash_fwd_kernel.h gLSE(row) = INFINITY on the equivalent early exit).
     // ======================================================================================
     if (block.block_min >= block.block_max || block.seqlen_k == 0) {
         const size_t q_base   = block.q_offset(D, H_Q, T_Q);
@@ -105,7 +213,7 @@ flash_attention_forward_varlen_kernel(
             for (int d = 0; d < D; ++d) {
                 Out[q_base + row * H_Q * D + d] = __float2half(0.0f);
             }
-            softmax_lse[lse_base + row] = NEG_INF;
+            softmax_lse[lse_base + row] = __int_as_float(0x7f800000);  // +inf
         }
         return;
     }
@@ -173,37 +281,24 @@ flash_attention_forward_varlen_kernel(
         if (valid_kv_rows <= 0) break;
 
         // ======================================================================================
-        // KV-CACHE (Paged vs Contiguous)
-        // ======================================================================================
-        const __half* __restrict__ k_ptr_page;
-        const __half* __restrict__ v_ptr_page;
-
-        if constexpr (IS_PAGED) {
-            const int page_idx    = start_kv / block_page;
-            const int page_offset = start_kv % block_page;
-            const int bt_idx      = block.batch_idx * block_table_stride + page_idx;
-            const int phys_page   = block_table[bt_idx];
-            const size_t kv_load  = static_cast<size_t>(phys_page) * kv_block_stride +
-                                    static_cast<size_t>(page_offset) * H_K * D +
-                                    static_cast<size_t>(block.kv_head_idx) * D;
-            k_ptr_page = K + kv_load;
-            v_ptr_page = V + kv_load;
-        } else {
-            const size_t kv_load  = static_cast<size_t>(block.k_base + start_kv) * H_K * D +
-                                    static_cast<size_t>(block.kv_head_idx) * D;
-            k_ptr_page = K + kv_load;
-            v_ptr_page = V + kv_load;
-        }
-
-        // ======================================================================================
         // Load:     K tile from global to sK shared memory
         // Layout:   K: global[row: BLOCK_N, H_K * D] -> shared[row: BLOCK_N, D_STRIDE]
         // Template: DUAL_LOAD=false, SMEM_STRIDE=D_STRIDE, GLOBAL_WIDTH=D (varlen sub-tile)
+        // Paged:    the tile is loaded page-by-page (may span several physical pages).
         // ======================================================================================
-        WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
-          k_ptr_page, sK,
-          nullptr,    nullptr,
-          H_K * D, valid_kv_rows, tid);
+        if constexpr (IS_PAGED) {
+            WMMA_GEMM_LOAD_PAGED_TILE<Config, D_STRIDE, D>(
+              K, block_table, sK,
+              start_kv, valid_kv_rows, block_page, block_table_stride, block_table_pages,
+              block.batch_idx, block.kv_head_idx, kv_block_stride, H_K * D, D, tid);
+        } else {
+            const size_t kv_load  = static_cast<size_t>(block.k_base + start_kv) * H_K * D +
+                                    static_cast<size_t>(block.kv_head_idx) * D;
+            WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
+              K + kv_load, sK,
+              nullptr,    nullptr,
+              H_K * D, valid_kv_rows, tid);
+        }
         __syncthreads();
 
         // ======================================================================================
@@ -237,11 +332,21 @@ flash_attention_forward_varlen_kernel(
         // Load:     V tile from global to sV shared memory
         // Layout:   V: global[row: BLOCK_N, H_K * D] -> shared[row: BLOCK_N, D_STRIDE]
         // Template: DUAL_LOAD=false, SMEM_STRIDE=D_STRIDE, GLOBAL_WIDTH=D (varlen sub-tile)
+        // Paged:    the tile is loaded page-by-page (may span several physical pages).
         // ======================================================================================
-        WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
-          v_ptr_page, sV,
-          nullptr,    nullptr,
-          H_K * D, valid_kv_rows, tid);
+        if constexpr (IS_PAGED) {
+            WMMA_GEMM_LOAD_PAGED_TILE<Config, D_STRIDE, D>(
+              V, block_table, sV,
+              start_kv, valid_kv_rows, block_page, block_table_stride, block_table_pages,
+              block.batch_idx, block.kv_head_idx, kv_block_stride, H_K * D, D, tid);
+        } else {
+            const size_t kv_load  = static_cast<size_t>(block.k_base + start_kv) * H_K * D +
+                                    static_cast<size_t>(block.kv_head_idx) * D;
+            WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
+              V + kv_load, sV,
+              nullptr,    nullptr,
+              H_K * D, valid_kv_rows, tid);
+        }
         __syncthreads();
 
         // ==============================================================================
@@ -313,6 +418,7 @@ void launcher_flash_attention_forward_varlen(
     const int H_K                = paged_KV ? K.size(2) : K.size(1);
     const int block_page         = paged_KV ? K.size(1) : 1;
     const int block_table_stride = (paged_KV && block_table.defined()) ? block_table.stride(0) : 0;
+    const int block_table_pages  = (paged_KV && block_table.defined()) ? static_cast<int>(block_table.size(1)) : 0;
     const int kv_block_stride    = paged_KV ? K.stride(0) : 0;
 
     const dim3 grid((max_seqlen_q + Config::DO::BLOCK_M - 1) / Config::DO::BLOCK_M, 1, B * H_Q);
@@ -338,6 +444,24 @@ void launcher_flash_attention_forward_varlen(
     const int*    leftpad_k_ptr    = leftpad_k.defined() ? leftpad_k.data_ptr<int>() : nullptr;
     const int*    block_table_ptr  = paged_KV ? block_table.data_ptr<int>() : nullptr;
 
+    // Paged-table coverage check (research/11 R2): the device loader stops writing tile
+    // rows once the block table runs out, and consumers only mask columns beyond
+    // valid_kv_rows -- unwritten rows inside the valid range are stale shared memory.
+    // Well-formed tables always cover the keys; reject under-sized ones on the host
+    // instead of silently attending to stale data.
+    if (paged_KV && block_table.defined()) {
+        for (int b = 0; b < B; ++b) {
+            const int tk_b   = cu_seqlens_k_ptr[b + 1] - cu_seqlens_k_ptr[b];
+            const int used_b = seqused_k_ptr ? (seqused_k_ptr[b] < tk_b ? seqused_k_ptr[b] : tk_b) : tk_b;
+            const int pad_b  = leftpad_k_ptr ? leftpad_k_ptr[b] : 0;
+            const int need_b = (used_b + pad_b + block_page - 1) / block_page;
+            TORCH_CHECK(need_b <= block_table_pages,
+                        "block_table too short for batch ", b, ": need ", need_b,
+                        " pages for ", used_b, " keys (+", pad_b, " leftpad, page size ",
+                        block_page, "), block_table has ", block_table_pages, " columns");
+        }
+    }
+
     dispatch_attention_features(is_causal, is_alibi, is_softcap, is_window, is_dropout, is_paged, is_rope, is_interleaved,
     [&](auto CAUSAL, auto ALIBI, auto SOFTCAP, auto WINDOW, auto DROPOUT, auto PAGED, auto /*ROPE*/, auto /*INTERLEAVED*/) {
         constexpr bool IS_CAUSAL  = decltype(CAUSAL)::value;
@@ -355,7 +479,7 @@ void launcher_flash_attention_forward_varlen(
             cu_seqlens_q_ptr, cu_seqlens_k_ptr,
             seqused_k_ptr, leftpad_k_ptr, block_table_ptr,
             B, H_Q, H_K, T_Q, max_seqlen_q, max_seqlen_k,
-            block_page, block_table_stride, kv_block_stride,
+            block_page, block_table_stride, block_table_pages, kv_block_stride,
             softmax_scale, softcap, alibi_slopes, alibi_batch, window_left, window_right,
             p_dropout, dropout_seed, dropout_offset
         );
@@ -539,6 +663,12 @@ std::vector<at::Tensor> flash_attention_varlen_forward(
     }
 
     if (T_Q == 0 || max_seqlen_k == 0) {
+        // Empty KV: upstream flash_api.cpp:737-743 overrides the zero_tensors pre-fill and
+        // returns zeroed out with lse = +inf (empty-sequence sentinel), regardless of
+        // zero_tensors. Non-empty zero_tensors semantics are unchanged above.
+        // (dmask has shape {T_Q, H_Q, max_seqlen_k}, so it is empty here; nothing to fill.)
+        out_fp16.zero_();
+        softmax_lse.fill_(std::numeric_limits<float>::infinity());
         return {out_fp16, softmax_lse, dmask, rng_state};
     }
 

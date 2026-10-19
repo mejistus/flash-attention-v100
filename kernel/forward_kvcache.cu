@@ -19,10 +19,116 @@
 #include "rotary.h"
 
 // ======================================================================================
+// PAGED KV SEGMENT LOADERS
+// A paged tile can span several physical pages: BLOCK_N (up to 512 for D=16) can exceed
+// block_page (>= 256). The tile is therefore loaded page by page:
+//   - WMMA_GEMM_LOAD_TILE_ROW_OFFSET loads one (page, offset) segment into tile rows
+//     [ROW_OFFSET, ROW_OFFSET + VALID_ROWS). Layout/asm are identical to
+//     WMMA_GEMM_LOAD_TILE, except the shared-memory swizzle uses the tile-global row
+//     index (ROW_OFFSET + row). The smem consumers (load_matrix_sync) apply the same
+//     swizzle per 16-row sub-tile, so the segments compose into one logical tile.
+//   - WMMA_GEMM_LOAD_PAGED_TILE walks the pages of the logical position range
+//     [start_pos, start_pos + valid_kv_rows). If a required page index is outside the
+//     block table, the remaining rows are left unwritten. Consumers only mask columns
+//     >= valid_kv_rows, so such rows are *stale shared memory*, NOT masked (no OOB
+//     access, but wrong values). In kvcache the table is sized from seqlen_k by
+//     construction (host sets max_seqlen_k from the table), so this cannot trigger;
+//     keep the table large enough for seqlen_k + leftpad in any case.
+// ======================================================================================
+template<typename Config, int SMEM_STRIDE, int GLOBAL_WIDTH>
+__device__ __forceinline__ void WMMA_GEMM_LOAD_TILE_ROW_OFFSET(
+    const __half* __restrict__ GMEM,
+          __half* __restrict__ SMEM,
+    int GLOBAL_STRIDE,
+    int ROW_OFFSET,
+    int VALID_ROWS,
+    int THREAD_ID
+) {
+    constexpr int THREADS_PER_BLOCK = Config::THREADS_PER_BLOCK;
+    constexpr int dst_stride_uint4  = (SMEM_STRIDE + 7) >> 3;
+    const     int wth_stride_uint4  = (((GLOBAL_WIDTH > 0) ? GLOBAL_WIDTH : GLOBAL_STRIDE) + 7) >> 3;
+    const     int src_stride_uint4  = (GLOBAL_STRIDE + 7) >> 3;
+
+    const     int total_iters       = VALID_ROWS * wth_stride_uint4;
+
+    if (total_iters == 0) return;
+
+    const uint64_t src_base = static_cast<uint64_t>(__cvta_generic_to_global(GMEM));
+    const uint32_t dst_base = static_cast<uint32_t>(__cvta_generic_to_shared(SMEM));
+
+    #pragma unroll 2
+    for (int idx = THREAD_ID; idx < total_iters; idx += THREADS_PER_BLOCK) {
+        const int row        = idx / wth_stride_uint4;
+        const int col        = idx % wth_stride_uint4;
+        const int global_row = ROW_OFFSET + row;
+
+        const int src_offset = row * src_stride_uint4 + col;
+        const int dst_offset = global_row * dst_stride_uint4 + col;
+
+        const int pred = (col < src_stride_uint4) ? 1 : 0;
+
+        uint64_t src_addr = src_base + (static_cast<uint64_t>(src_offset) << 4);
+        uint32_t dst_addr = swizzle(dst_base + (static_cast<uint32_t>(dst_offset) << 4), global_row);
+
+        uint32_t r0, r1, r2, r3;
+        asm volatile(
+            "{\n\t"
+            ".reg .pred p;\n\t"
+            "setp.ne.b32 p, %5, 0;\n\t"
+            "mov.u32 %0, 0;\n\t"
+            "mov.u32 %1, 0;\n\t"
+            "mov.u32 %2, 0;\n\t"
+            "mov.u32 %3, 0;\n\t"
+            "@p ld.global.v4.u32 {%0, %1, %2, %3}, [%4];\n\t"
+            "st.shared.v4.u32 [%6], {%0, %1, %2, %3};\n\t"
+            "}\n\t"
+            : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
+            : "l"(src_addr), "r"(pred), "r"(dst_addr)
+            : "memory"
+        );
+    }
+}
+
+template<typename Config, int SMEM_STRIDE, int GLOBAL_WIDTH>
+__device__ __forceinline__ void WMMA_GEMM_LOAD_PAGED_TILE(
+    const __half* __restrict__ BASE,
+    const int*    __restrict__ block_table,
+          __half* __restrict__ SMEM,
+    int start_pos,
+    int valid_kv_rows,
+    int block_page,
+    int block_table_stride,
+    int block_table_pages,
+    int batch_idx,
+    int kv_head_idx,
+    int kv_block_stride,
+    int global_stride,
+    int head_stride,
+    int THREAD_ID
+) {
+    const int page_idx    = start_pos / block_page;
+    const int page_offset = start_pos % block_page;
+    const int bt_idx      = batch_idx * block_table_stride + page_idx;
+
+    int rows_done = 0;
+    for (int seg = 0; rows_done < valid_kv_rows; ++seg) {
+        if (page_idx + seg >= block_table_pages) break;  // under-sized table: see header note
+        const int off_cur = (seg == 0) ? page_offset : 0;
+        const size_t kv_load = static_cast<size_t>(block_table[bt_idx + seg]) * kv_block_stride +
+                               static_cast<size_t>(off_cur) * global_stride +
+                               static_cast<size_t>(kv_head_idx) * head_stride;
+        const int rows_seg = min(valid_kv_rows - rows_done, block_page - off_cur);
+        WMMA_GEMM_LOAD_TILE_ROW_OFFSET<Config, SMEM_STRIDE, GLOBAL_WIDTH>(
+            BASE + kv_load, SMEM, global_stride, rows_done, rows_seg, THREAD_ID);
+        rows_done += rows_seg;
+    }
+}
+
+// ======================================================================================
 // KV-CACHE FORWARD KERNEL
 // ======================================================================================
 template<int D, bool IS_CAUSAL, bool IS_ALIBI, bool IS_SOFTCAP, bool IS_WINDOW, bool IS_PAGED, bool IS_ROPE, bool IS_INTERLEAVED>
-__global__ void __launch_bounds__(KernelConfig<D>::THREADS_PER_BLOCK, 2)
+__global__ void __launch_bounds__(KernelConfig<D>::THREADS_PER_BLOCK)
 flash_attention_kvcache_kernel(
     const __half* __restrict__ Q,
     const __half* __restrict__ K_new,
@@ -45,6 +151,7 @@ flash_attention_kvcache_kernel(
     const int     max_seqlen_k,
     const int     block_page,
     const int     block_table_stride,
+    const int     block_table_pages,
     const int     kv_block_stride,
     const int     rotary_dim,
     const float   softmax_scale,
@@ -82,7 +189,12 @@ flash_attention_kvcache_kernel(
 
     const int cache_bidx     = (cache_batch_idx != nullptr) ? cache_batch_idx[batch_idx] : batch_idx;
     const int leftpad        = (leftpad_k != nullptr) ? leftpad_k[batch_idx] : 0;
-    const int cache_seqlen   = (cache_seqlens != nullptr) ? cache_seqlens[cache_bidx] : 0;
+    // cache_seqlens == nullptr means "attend the full cache" (upstream flash_api.cpp:1265:
+    // seqlen_k = kcache.size(1); BlockInfo seqlen_k_cache = seqlen_k - leftpad). max_seqlen_k
+    // is the cache capacity computed by the launcher: kcache.size(1) when not paged, or
+    // max_num_blocks_per_seq * page_block_size when paged (leftpad is 0 for paged).
+    const int cache_seqlen   = (cache_seqlens != nullptr) ? cache_seqlens[cache_bidx]
+                                                         : (max_seqlen_k - leftpad);
     const int total_seqlen_k = cache_seqlen + T_NEW;
 
     BlockInfo<IS_CAUSAL, IS_WINDOW, false> block;
@@ -105,6 +217,8 @@ flash_attention_kvcache_kernel(
 
     if (block.start_q >= block.seqlen_q || block.valid_q_rows <= 0) return;
 
+    // Early exit: no valid KV blocks (causal/window/empty cache) -> zeros + upstream
+    // sentinel +inf for LSE (upstream flash_fwd_kernel.h writes INFINITY there).
     if (block.block_min >= block.block_max || total_seqlen_k == 0) {
         const size_t out_off = static_cast<size_t>(batch_idx) * stride_o_b +
                                static_cast<size_t>(head_idx)  * stride_o_h + block.start_q * stride_o_s;
@@ -113,7 +227,7 @@ flash_attention_kvcache_kernel(
         for (int row = threadIdx.x; row < block.valid_q_rows; row += blockDim.x) {
             #pragma unroll
             for (int d = 0; d < D; ++d) Out[out_off + row * stride_o_s + d] = __float2half(0.0f);
-            softmax_lse[lse_off + row] = NEG_INF;
+            softmax_lse[lse_off + row] = __int_as_float(0x7f800000);  // +inf
         }
         return;
     }
@@ -191,38 +305,25 @@ flash_attention_kvcache_kernel(
         if (valid_kv_rows <= 0) break;
 
         // ======================================================================================
-        // KV-CACHE (Paged vs Contiguous)
+        // Load:     K tile from global to sK shared memory
+        // Layout:   K: global[row: BLOCK_N, H_K * D] -> shared[row: BLOCK_N, D_STRIDE]
+        // Template: DUAL_LOAD=false, SMEM_STRIDE=D_STRIDE, GLOBAL_WIDTH=D (varlen sub-tile)
+        // Paged:    the tile is loaded page-by-page (may span several physical pages).
         // ======================================================================================
-        const __half* __restrict__ k_ptr_page;
-        const __half* __restrict__ v_ptr_page;
-
         if constexpr (IS_PAGED) {
-            const int page_idx    = (start_kv + leftpad) / block_page;
-            const int page_offset = (start_kv + leftpad) % block_page;
-            const int bt_idx      = cache_bidx * block_table_stride + page_idx;
-            const int phys_page   = block_table[bt_idx];
-            const size_t kv_load  = static_cast<size_t>(phys_page) * kv_block_stride +
-                                    static_cast<size_t>(page_offset) * stride_k_s +
-                                    static_cast<size_t>(kv_head_idx) * stride_k_h;
-            k_ptr_page = K_cache + kv_load;
-            v_ptr_page = V_cache + kv_load;
+            WMMA_GEMM_LOAD_PAGED_TILE<Config, D_STRIDE, D>(
+              K_cache, block_table, sK,
+              start_kv + leftpad, valid_kv_rows, block_page, block_table_stride, block_table_pages,
+              cache_bidx, kv_head_idx, kv_block_stride, stride_k_s, stride_k_h, tid);
         } else {
             const size_t kv_load = static_cast<size_t>(cache_bidx) * stride_k_b +
                                    static_cast<size_t>(start_kv + leftpad) * stride_k_s +
                                    static_cast<size_t>(kv_head_idx) * stride_k_h;
-            k_ptr_page = K_cache + kv_load;
-            v_ptr_page = V_cache + kv_load;
+            WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
+              K_cache + kv_load, sK,
+              nullptr,    nullptr,
+              stride_k_s, valid_kv_rows, tid);
         }
-
-        // ======================================================================================
-        // Load:     K tile from global to sK shared memory
-        // Layout:   K: global[row: BLOCK_N, H_K * D] -> shared[row: BLOCK_N, D_STRIDE]
-        // Template: DUAL_LOAD=false, SMEM_STRIDE=D_STRIDE, GLOBAL_WIDTH=D (varlen sub-tile)
-        // ======================================================================================
-        WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
-          k_ptr_page, sK,
-          nullptr,    nullptr,
-          stride_k_s, valid_kv_rows, tid);
         __syncthreads();
 
         // ======================================================================================
@@ -255,11 +356,22 @@ flash_attention_kvcache_kernel(
         // Load:     V tile from global to sV shared memory
         // Layout:   V: global[row: BLOCK_N, H_K * D] -> shared[row: BLOCK_N, D_STRIDE]
         // Template: DUAL_LOAD=false, SMEM_STRIDE=D_STRIDE, GLOBAL_WIDTH=D (varlen sub-tile)
+        // Paged:    the tile is loaded page-by-page (may span several physical pages).
         // ======================================================================================
-        WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
-          v_ptr_page, sV,
-          nullptr,    nullptr,
-          stride_k_s, valid_kv_rows, tid);
+        if constexpr (IS_PAGED) {
+            WMMA_GEMM_LOAD_PAGED_TILE<Config, D_STRIDE, D>(
+              V_cache, block_table, sV,
+              start_kv + leftpad, valid_kv_rows, block_page, block_table_stride, block_table_pages,
+              cache_bidx, kv_head_idx, kv_block_stride, stride_k_s, stride_k_h, tid);
+        } else {
+            const size_t kv_load = static_cast<size_t>(cache_bidx) * stride_k_b +
+                                   static_cast<size_t>(start_kv + leftpad) * stride_k_s +
+                                   static_cast<size_t>(kv_head_idx) * stride_k_h;
+            WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
+              V_cache + kv_load, sV,
+              nullptr,    nullptr,
+              stride_k_s, valid_kv_rows, tid);
+        }
         __syncthreads();
 
         // ==============================================================================
@@ -337,6 +449,7 @@ void launcher_flash_attention_kvcache(
 
     const int block_page         = is_paged ? K_cache.size(1) : 1;
     const int block_table_stride = is_paged ? block_table.stride(0) : 0;
+    const int block_table_pages  = is_paged ? static_cast<int>(block_table.size(1)) : 0;
     const int kv_block_stride    = is_paged ? K_cache.stride(0) : 0;
 
     const dim3 grid((T_Q + Config::DO::BLOCK_M - 1) / Config::DO::BLOCK_M, 1, B * H_Q);
@@ -397,7 +510,7 @@ void launcher_flash_attention_kvcache(
             cache_seqlens_ptr, cache_batch_idx_ptr, leftpad_k_ptr, block_table_ptr,
             rotary_cos_ptr, rotary_sin_ptr,
             B, H_Q, H_K, T_Q, T_NEW, max_seqlen_k,
-            block_page, block_table_stride, kv_block_stride, rotary_dim,
+            block_page, block_table_stride, block_table_pages, kv_block_stride, rotary_dim,
             softmax_scale, softcap, alibi_slopes, alibi_batch,
             window_left, window_right,
             stride_q_b, stride_q_s, stride_q_h,
@@ -624,8 +737,11 @@ std::vector<at::Tensor> flash_attention_kvcache(
 
     // Empty case
     if (T_Q == 0 || max_seqlen_k == 0) {
+        // Empty KV cache and/or no queries: zeroed out + lse = +inf (empty-sequence
+        // sentinel, same convention as forward.cu / forward_varlen.cu; upstream
+        // softmax.h normalize_softmax_lse also uses +inf when no key was attended).
         out_fp16.zero_();
-        softmax_lse.fill_(-std::numeric_limits<float>::infinity());
+        softmax_lse.fill_(std::numeric_limits<float>::infinity());
         return {out_fp16, softmax_lse};
     }
 

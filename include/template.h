@@ -200,8 +200,12 @@ struct BlockInfo {
         if constexpr (IS_VARLEN) {
             return static_cast<size_t>(q_base + start_q) * H_Q * D + static_cast<size_t>(head_idx) * D;
         } else {
-            int batch_head_id = batch_idx * H_Q + head_idx;
-            return static_cast<size_t>(batch_head_id) * M_or_TQ * D + static_cast<size_t>(start_q) * D;
+            // Dense layout is BMHD [B, M, H_Q, D] (official FA2 layout): offset is
+            // (batch * M + row) * H_Q * D + head * D. It used to be BHMD, which forced
+            // the Python layer to permute + copy q/k/v/out (research: ~320 MiB extra
+            // at 8k tokens during training).
+            return (static_cast<size_t>(batch_idx) * M_or_TQ + static_cast<size_t>(start_q)) * H_Q * D
+                 + static_cast<size_t>(head_idx) * D;
         }
     }
 
@@ -212,8 +216,9 @@ struct BlockInfo {
         if constexpr (IS_VARLEN) {
             return static_cast<size_t>(k_base) * H_K * D + static_cast<size_t>(kv_head_idx) * D;
         } else {
-            int batch_head_id = batch_idx * H_K + kv_head_idx;
-            return static_cast<size_t>(batch_head_id) * N_or_TK * D;
+            // BMHD [B, N, H_K, D] (see q_offset).
+            return static_cast<size_t>(batch_idx) * N_or_TK * H_K * D
+                 + static_cast<size_t>(kv_head_idx) * D;
         }
     }
 

@@ -1,0 +1,18 @@
+# SASS static evidence (trimmed; full dump was 1.3 GB and is reproducible via scripts/verify_sass.sh)
+# command: bash scripts/verify_sass.sh --so <installed .so> --out-dir tests/artifacts/sass --extract-cubins
+# tools: cuobjdump: NVIDIA (R) fat binary listing tool
+# cubins: 5, all sm_70; embedded PTX: none
+# HMMA.884: 657824    FFMA: 108016    forbidden post-Volta opcodes: 0
+
+## sample HMMA.884 + FFMA lines
+        /*1930*/                   HMMA.884.F32.F32.STEP0 R28, R12.reuse.ROW, R16.reuse.COL, RZ ;           /* 0x000000100c1c7236 */
+        /*1940*/                   HMMA.884.F32.F32.STEP1 R30, R12.reuse.ROW, R16.reuse.COL, RZ ;           /* 0x000000100c1e7236 */
+        /*1950*/                   HMMA.884.F32.F32.STEP2 R32, R12.reuse.ROW, R16.reuse.COL, RZ ;           /* 0x000000100c207236 */
+        /*1960*/                   HMMA.884.F32.F32.STEP3 R34, R12.ROW, R16.COL, RZ ;                       /* 0x000000100c227236 */
+        /*1970*/                   HMMA.884.F32.F32.STEP0 R28, R14.reuse.ROW, R18.reuse.COL, R28 ;          /* 0x000000120e1c7236 */
+        /*1990*/                   HMMA.884.F32.F32.STEP1 R30, R14.reuse.ROW, R18.reuse.COL, R30 ;          /* 0x000000120e1e7236 */
+        /*4090*/                   FFMA.FTZ R7, R7, R28, RZ ;                                               /* 0x0000001c07077223 */
+        /*40b0*/                   FFMA.FTZ R7, R8, R32, R7 ;                                               /* 0x0000002008077223 */
+        /*4110*/                   FFMA.FTZ R7, R8, R32, R7 ;                                               /* 0x0000002008077223 */
+
+## kernels present (sample of entry symbols)

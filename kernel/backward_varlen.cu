@@ -24,7 +24,7 @@
 // BACKWARD VARLEN KERNEL
 // ======================================================================================
 template<int D, bool IS_CAUSAL, bool IS_ALIBI, bool IS_SOFTCAP, bool IS_WINDOW, bool IS_DROPOUT>
-__global__ void __launch_bounds__(KernelConfig<D>::THREADS_PER_BLOCK, 2)
+__global__ void __launch_bounds__(KernelConfig<D>::THREADS_PER_BLOCK)
 flash_attention_backward_varlen_kernel(
     const __half* __restrict__ Q,
     const __half* __restrict__ K,
@@ -248,7 +248,8 @@ flash_attention_backward_varlen_kernel(
             // Compute:  dS = exp(S - lse) * (dOV - row_dot) * softmax_scale
             // Layout:   sS[valid_q_rows, N_STRIDE], sdOV[valid_q_rows, N_STRIDE]
             //           -> sdS[valid_q_rows, N_STRIDE]
-            // Varlen:   GLOBAL_N=block.seqlen_k (actual KV length) for correct dropout RNG stride
+            // Varlen:   GLOBAL_N=max_seqlen_k (same RNG key space as fwd; P0-1).
+            //           Must NOT be block.seqlen_k: fwd uses max_seqlen_k.
             // Template: IS_DROPOUT guards compile-time; runtime p_dropout > 0 enables execution
             // ======================================================================================
             WMMA_GEMM_SOFTMAX_GRADIENT<Config, GemmType::compute_dS, IS_SOFTCAP, IS_DROPOUT, N_STRIDE, N_STRIDE * 2, BLOCK_M, BLOCK_N>(
@@ -256,7 +257,7 @@ flash_attention_backward_varlen_kernel(
               block.valid_q_rows, valid_kv_rows,
               softmax_scale, softcap,
               p_dropout, dropout_seed, dropout_offset,
-              block.q_base + block.start_q, start_kv, block.seqlen_k,
+              block.q_base + block.start_q, start_kv, max_seqlen_k,
               tid);
             __syncthreads();
 
@@ -299,12 +300,15 @@ flash_attention_backward_varlen_kernel(
         constexpr int M_STRIDE  = Config::DKV::M_STRIDE;
 
         // ======================================================================================
-        // Grid Mapping: 1D X for KV-blocks, Z for bthd_idx. Batch resolved device-side.
+        // Grid Mapping: 1D X for KV-blocks, Z for the KV head. Batch resolved device-side.
         // ======================================================================================
         const int block_idx     = blockIdx.x;
-        const int bthd_idx      = blockIdx.z;
-
-        if (bthd_idx >= B * H_Q) return;
+        // dKV runs one CTA per KV head (not per Q head); it loops over the Q-head group
+        // internally, so no (T_K, H_Q, D) expansion buffers are needed for GQA/MQA.
+        const int kv_head_id    = blockIdx.z;
+        if (kv_head_id >= B * H_K) return;
+        // init_kv resolves batch/kv-head from a Q-head id: pass the first head of the group.
+        const int bthd_idx      = (kv_head_id / H_K) * H_Q + (kv_head_id % H_K) * (H_Q / H_K);
 
         // ======================================================================================
         // BlockInfo: Metadata resolution
@@ -334,12 +338,12 @@ flash_attention_backward_varlen_kernel(
         // Writes deterministic zeros to dK and dV for Q-head only
         // ======================================================================================
         if (block.block_min >= block.block_max || block.seqlen_q == 0) {
-            const size_t dkdv_offset = static_cast<size_t>(block.k_base + block.start_kv) * H_Q * D + static_cast<size_t>(block.head_idx) * D;
+            const size_t dkdv_offset = static_cast<size_t>(block.k_base + block.start_kv) * H_K * D + static_cast<size_t>(block.kv_head_idx) * D;
             for (int row = threadIdx.x; row < block.valid_kv_rows; row += blockDim.x) {
                 #pragma unroll
                 for (int idx = 0; idx < D; ++idx) {
-                    dK[dkdv_offset + row * H_Q * D + idx] = __float2half(0.0f);
-                    dV[dkdv_offset + row * H_Q * D + idx] = __float2half(0.0f);
+                    dK[dkdv_offset + row * H_K * D + idx] = __float2half(0.0f);
+                    dV[dkdv_offset + row * H_K * D + idx] = __float2half(0.0f);
                 }
             }
             return;
@@ -350,25 +354,17 @@ flash_attention_backward_varlen_kernel(
         const int tid     = threadIdx.x;
         const int warp_id = tid >> 5;
         const int lane_id = tid & 31;
-        // Alibi slope only for valid block + batch
-        const int   alibi_idx   = (alibi_batch > 0) ? (block.batch_idx * alibi_batch + block.head_idx) : block.head_idx;
-        const float alibi_slope = (alibi_slopes != nullptr) ? alibi_slopes[alibi_idx] : 0.0f;
-
         // ======================================================================================
         // Layout:
         //   K/V:      [T_K, H_K, D] offset follows k_base, kv_head_idx
-        //   Q/O/dO:   [T_Q, H_Q, D] base follows q_base, head_idx (sequence offset added inside loop)
-        //   LSE:      [H_Q, T_Q]    base follows head_idx * T_Q + q_base
-        //   dK/dV:    [T_K, H_Q, D] offset follows k_base + start_kv, head_idx
+        //   Q/O/dO:   [T_Q, H_Q, D] per q-head inside the group loop below
+        //   LSE:      [H_Q, T_Q]    per q-head inside the group loop below
+        //   dK/dV:    [T_K, H_K, D] one writer per KV head (no expansion buffer)
         // ======================================================================================
         const __half* __restrict__ k_ptr   = K  + block.kv_offset(D, H_K, T_K);
         const __half* __restrict__ v_ptr   = V  + block.kv_offset(D, H_K, T_K);
-        const __half* __restrict__ q_ptr   = Q  + static_cast<size_t>(block.q_base) * H_Q * D + static_cast<size_t>(block.head_idx) * D;
-        const __half* __restrict__ o_ptr   = O  + static_cast<size_t>(block.q_base) * H_Q * D + static_cast<size_t>(block.head_idx) * D;
-        const __half* __restrict__ dO_ptr  = dO + static_cast<size_t>(block.q_base) * H_Q * D + static_cast<size_t>(block.head_idx) * D;
-        const  float* __restrict__ lse_ptr = softmax_lse + static_cast<size_t>(block.head_idx) * T_Q + block.q_base;
-              __half* __restrict__ dK_ptr  = dK + static_cast<size_t>(block.k_base + block.start_kv) * H_Q * D + static_cast<size_t>(block.head_idx) * D;
-              __half* __restrict__ dV_ptr  = dV + static_cast<size_t>(block.k_base + block.start_kv) * H_Q * D + static_cast<size_t>(block.head_idx) * D;
+              __half* __restrict__ dK_ptr  = dK + static_cast<size_t>(block.k_base + block.start_kv) * H_K * D + static_cast<size_t>(block.kv_head_idx) * D;
+              __half* __restrict__ dV_ptr  = dV + static_cast<size_t>(block.k_base + block.start_kv) * H_K * D + static_cast<size_t>(block.kv_head_idx) * D;
 
         // ======================================================================================
         // INIT SHARED MEMORY
@@ -404,6 +400,21 @@ flash_attention_backward_varlen_kernel(
           v_ptr + block.start_kv * H_K * D, sV,
           H_K * D, block.valid_kv_rows, tid);
         __syncthreads();
+
+        // ==================================================================================
+        // Q-HEAD GROUP LOOP: one CTA covers every Q head sharing this KV head and
+        // accumulates dK/dV in shared memory across the whole group. This removes the
+        // (T_K, H_Q, D) expansion buffers the old per-Q-head grid needed for GQA/MQA.
+        // ==================================================================================
+        const int ngroups = H_Q / H_K;
+        for (int group = 0; group < ngroups; ++group) {
+            const int q_head = block.head_idx + group;
+            const __half* __restrict__ q_ptr   = Q  + static_cast<size_t>(block.q_base) * H_Q * D + static_cast<size_t>(q_head) * D;
+            const __half* __restrict__ o_ptr   = O  + static_cast<size_t>(block.q_base) * H_Q * D + static_cast<size_t>(q_head) * D;
+            const __half* __restrict__ dO_ptr  = dO + static_cast<size_t>(block.q_base) * H_Q * D + static_cast<size_t>(q_head) * D;
+            const  float* __restrict__ lse_ptr = softmax_lse + static_cast<size_t>(q_head) * T_Q + block.q_base;
+            const int   alibi_idx   = (alibi_batch > 0) ? (block.batch_idx * alibi_batch + q_head) : q_head;
+            const float alibi_slope = (alibi_slopes != nullptr) ? alibi_slopes[alibi_idx] : 0.0f;
 
         // ==================================================================================
         // Q-TILES LOOP (Iterate over Q-tiles for to this KV-block for Q-head)
@@ -479,7 +490,8 @@ flash_attention_backward_varlen_kernel(
             // Compute:  P = softmax(S), dS = P * (dOV - row_dot) * softmax_scale
             // Layout:   sS[valid_q_rows, M_STRIDE] -> sP[valid_q_rows, M_STRIDE]
             //           sdS[valid_q_rows, M_STRIDE]
-            // Varlen:   GLOBAL_N=block.seqlen_k for correct dropout RNG stride
+            // Varlen:   GLOBAL_N=max_seqlen_k (same RNG key space as fwd; P0-1).
+            //           Must NOT be block.seqlen_k: fwd uses max_seqlen_k.
             // Template: IS_DROPOUT guards compile-time; runtime p_dropout > 0 enables execution
             // ======================================================================================
             WMMA_GEMM_SOFTMAX_GRADIENT<Config, GemmType::compute_P_dS, IS_SOFTCAP, IS_DROPOUT, M_STRIDE, M_STRIDE * 2, BLOCK_N, BLOCK_M>(
@@ -487,7 +499,7 @@ flash_attention_backward_varlen_kernel(
               valid_q_rows, block.valid_kv_rows,
               softmax_scale, softcap,
               p_dropout, dropout_seed, dropout_offset,
-              block.q_base + start_q, block.start_kv, block.seqlen_k,
+              block.q_base + start_q, block.start_kv, max_seqlen_k,
               tid);
             __syncthreads();
 
@@ -524,16 +536,17 @@ flash_attention_backward_varlen_kernel(
               warp_id, lane_id);
             __syncthreads();
         }  // END Q-TILES LOOP
+        }  // END Q-HEAD GROUP LOOP
         // ======================================================================================
-        // Compute:  Store dK & dV for current Q-head to global memory (Expanded Layout)
-        // Layout:   sdK[row: valid_kv_rows, D_STRIDE] -> dK_ptr[row: valid_kv_rows, H_Q * D]
-        //           sdV[row: valid_kv_rows, D_STRIDE] -> dV_ptr[row: valid_kv_rows, H_Q * D]
+        // Compute:  Store dK & dV for this KV head to global memory (H_K layout)
+        // Layout:   sdK[row: valid_kv_rows, D_STRIDE] -> dK_ptr[row: valid_kv_rows, H_K * D]
+        //           sdV[row: valid_kv_rows, D_STRIDE] -> dV_ptr[row: valid_kv_rows, H_K * D]
         // Template: DUAL_STORE=true, SMEM_STRIDE=D_STRIDE, GLOBAL_WIDTH=D (varlen sub-tile store)
         // ======================================================================================
         WMMA_GEMM_EPILOGUE<Config, GemmType::write_dKV, D_STRIDE, D>(
           sdK,     dK_ptr,
           sdV,     dV_ptr,
-          nullptr, H_Q * D, block.valid_kv_rows, tid);
+          nullptr, H_K * D, block.valid_kv_rows, tid);
     }
 }
 
@@ -758,10 +771,6 @@ std::vector<at::Tensor> flash_attention_varlen_backward(
         TORCH_CHECK(dv_fp16.sizes() == k.sizes(), "dv shape must match k shape");
     }
 
-    // GQA/MQA expansion buffers
-    at::Tensor dk_expanded = (H_K != H_Q) ? torch::empty({T_K, H_Q, D}, q.options()) : dk_fp16;
-    at::Tensor dv_expanded = (H_K != H_Q) ? torch::empty({T_K, H_Q, D}, q.options()) : dv_fp16;
-
     // dLSE tensor
     auto softmax_d = torch::empty({H_Q, T_Q}, torch::dtype(torch::kFloat32).device(q.device()));
     TORCH_CHECK(softmax_d.dtype() == torch::kFloat32, "softmax_d must be fp32");
@@ -769,8 +778,8 @@ std::vector<at::Tensor> flash_attention_varlen_backward(
     // zero tensors / empty case
     if (zero_tensors) {
         dq_fp16.zero_();
-        dk_expanded.zero_();
-        dv_expanded.zero_();
+        dk_fp16.zero_();
+        dv_fp16.zero_();
         softmax_d.zero_();
     }
 
@@ -782,7 +791,7 @@ std::vector<at::Tensor> flash_attention_varlen_backward(
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
     #define LAUNCH_KERNEL(DIM) \
-        launcher_flash_attention_backward_varlen<DIM>(q, k, v, out, dout, softmax_lse, dq_fp16, dk_expanded, dv_expanded, softmax_d, cu_seqlens_q, cu_seqlens_k, \
+        launcher_flash_attention_backward_varlen<DIM>(q, k, v, out, dout, softmax_lse, dq_fp16, dk_fp16, dv_fp16, softmax_d, cu_seqlens_q, cu_seqlens_k, \
                                                       T_Q, T_K, max_seqlen_q, max_seqlen_k, softmax_scale, is_causal, softcap, p_dropout, alibi_ptr, alibi_batch, \
                                                        window_left, window_right, dropout_seed, dropout_offset, stream);
     switch (D) {
@@ -795,11 +804,6 @@ std::vector<at::Tensor> flash_attention_varlen_backward(
     }
     #undef LAUNCH_KERNEL
 
-    // reduce expanded gradients for GQA/MQA
-    if (H_K != H_Q) {
-        at::sum_out(dk_fp16, at::reshape(dk_expanded, {T_K, H_K, H_Q / H_K, D}), {2});
-        at::sum_out(dv_fp16, at::reshape(dv_expanded, {T_K, H_K, H_Q / H_K, D}), {2});
-    }
 
     return {dq_fp16, dk_fp16, dv_fp16, softmax_d};
 }

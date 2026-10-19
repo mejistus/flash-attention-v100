@@ -15,8 +15,8 @@
 #define BLOCK_M_64  64
 #define BLOCK_N_64  128
 
-#define BLOCK_M_128 32
-#define BLOCK_N_128 176
+#define BLOCK_M_128 64
+#define BLOCK_N_128 64
 
 #define BLOCK_M_256 32
 #define BLOCK_N_256 64

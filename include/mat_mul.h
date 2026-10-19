@@ -113,7 +113,7 @@ __device__ __forceinline__ void WMMA_GEMM_SCORES(
                             val = __fmaf_rn(-ALIBI_SLOPE, fabsf(static_cast<float>(global_m - (global_n - SEQLEN_OFFSET))), val);
                         }
                         if constexpr (IS_SOFTCAP) {
-                            val = __fmul_rn(SOFTCAP, __tanhf(__fmul_rn(val, softcap_rcp)));
+                            val = __fmul_rn(SOFTCAP, tanhf(__fmul_rn(val, softcap_rcp)));
                         }
                     } else {
                         val = NEG_INF;
@@ -142,7 +142,7 @@ __device__ __forceinline__ void WMMA_GEMM_SCORES(
                         val = __fmaf_rn(-ALIBI_SLOPE, fabsf(static_cast<float>(global_m - (global_n - SEQLEN_OFFSET))), val);
                     }
                     if constexpr (IS_SOFTCAP) {
-                        val = __fmul_rn(SOFTCAP, __tanhf(__fmul_rn(val, softcap_rcp)));
+                        val = __fmul_rn(SOFTCAP, tanhf(__fmul_rn(val, softcap_rcp)));
                     }
                 } else {
                     val = NEG_INF;

@@ -1,5 +1,12 @@
 [<- Main](../../README.md)
 
+> **Legacy document.** The current, official-named build
+> (`flash-attn` 2.8.3 / `import flash_attn` / extension `flash_attn_2_cuda`) is
+> documented in [`install_cuda126.md`](install_cuda126.md) and the top-level
+> [README](../../README.md). The commands below describe an older package name.
+
+[<- Main](../../README.md)
+
 Last one available CUDA for Volta:
 -------------
 
@@ -59,9 +66,9 @@ pip install . --no-build-isolation -v
 Also after you can final check ready venv
 
 ```
-Successfully built flash_attn_v100
-Installing collected packages: flash_attn_v100
-Successfully installed flash_attn_v100-XX.XX
+Successfully built flash_attn
+Installing collected packages: flash_attn
+Successfully installed flash_attn-2.8.3
 
 # just check exactly flash_attn import thru
 

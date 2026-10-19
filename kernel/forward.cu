@@ -23,7 +23,7 @@
 // FORWARD KERNEL
 // ======================================================================================
 template<int D, bool IS_CAUSAL, bool IS_ALIBI, bool IS_SOFTCAP, bool IS_WINDOW, bool IS_DROPOUT>
-__global__ void __launch_bounds__(KernelConfig<D>::THREADS_PER_BLOCK, 2)
+__global__ void __launch_bounds__(KernelConfig<D>::THREADS_PER_BLOCK)
 flash_attention_forward_kernel(
     const __half* __restrict__ Q,
     const __half* __restrict__ K,
@@ -132,10 +132,10 @@ flash_attention_forward_kernel(
     // Layout:   Q: global[row: BLOCK_M, D] -> shared[row: BLOCK_M, D_STRIDE]
     // Template: DUAL_LOAD=false, SRC_STRIDE=D, DST_STRIDE=D_STRIDE
     // ==================================================================================
-    WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE>(
+    WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
       q_ptr,   sQ,
       nullptr, nullptr,
-      D, block.valid_q_rows, tid);
+      H_Q * D, block.valid_q_rows, tid);
     __syncthreads();
 
     // ==================================================================================
@@ -150,10 +150,10 @@ flash_attention_forward_kernel(
         // Layout:   K: global[row: BLOCK_N, D] -> shared[row: BLOCK_N, D_STRIDE]
         // Template: DUAL_LOAD=false, SRC_STRIDE=D, DST_STRIDE=D_STRIDE
         // ==================================================================================
-        WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE>(
-          k_ptr + start_kv * D, sK,
+        WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
+          k_ptr + start_kv * H_K * D, sK,
           nullptr, nullptr,
-          D, valid_kv_rows, tid);
+          H_K * D, valid_kv_rows, tid);
         __syncthreads();
 
         // ==================================================================================
@@ -187,10 +187,10 @@ flash_attention_forward_kernel(
         // Layout:   V: global[row: BLOCK_N, D] -> shared[row: BLOCK_N, D_STRIDE]
         // Template: DUAL_LOAD=false, SRC_STRIDE=D, DST_STRIDE=D_STRIDE
         // ==================================================================================
-        WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE>(
-          v_ptr + start_kv * D, sV,
+        WMMA_GEMM_LOAD_TILE<Config, false, D_STRIDE, D>(
+          v_ptr + start_kv * H_K * D, sV,
           nullptr, nullptr,
-          D, valid_kv_rows, tid);
+          H_K * D, valid_kv_rows, tid);
         __syncthreads();
 
         // ==================================================================================
@@ -208,10 +208,10 @@ flash_attention_forward_kernel(
     // Layout:   sO[valid_q_rows, D_STRIDE] -> out_ptr[valid_q_rows, D]
     // Template  D, D_STRIDE  : Head dimension and shared memory stride
     // ==================================================================================
-    WMMA_GEMM_EPILOGUE<Config, GemmType::write_dO, D_STRIDE>(
+    WMMA_GEMM_EPILOGUE<Config, GemmType::write_dO, D_STRIDE, D>(
       sO,      out_ptr,
       nullptr, nullptr,
-      sRowSum, D, block.valid_q_rows, tid);
+      sRowSum, H_Q * D, block.valid_q_rows, tid);
 
     if (tid < block.valid_q_rows) {
         const float sum = fmaxf(sRowSum[tid], 1e-24f);
@@ -248,10 +248,10 @@ void launcher_flash_attention_forward(
     TORCH_CHECK(smem <= MAX_SMEM_PER_SM, "Shared memory exceeds 96KB for Forward kernel: ", smem, " bytes (", smem / 1024, " KB)");
 
     const int B   = Q.size(0);
-    const int H_Q = Q.size(1);
-    const int H_K = K.size(1);
-    const int M   = Q.size(2);
-    const int N   = K.size(2);
+    const int M   = Q.size(1);
+    const int H_Q = Q.size(2);
+    const int H_K = K.size(2);
+    const int N   = K.size(1);
 
     const dim3 grid((M + Config::DO::BLOCK_M - 1) / Config::DO::BLOCK_M, 1, B * H_Q);
     const dim3 block(Config::THREADS_PER_BLOCK);
@@ -324,11 +324,11 @@ std::vector<at::Tensor> flash_attention_forward(
 
     // dimensions
     const int B   = q.size(0);
-    const int H_Q = q.size(1);
-    const int M   = q.size(2);
+    const int M   = q.size(1);
+    const int H_Q = q.size(2);
     const int D   = q.size(3);
-    const int H_K = k.size(1);
-    const int N   = k.size(2);
+    const int H_K = k.size(2);
+    const int N   = k.size(1);
 
     TORCH_CHECK(B > 0, "batch size must be positive");
     TORCH_CHECK(D <= 256, "head dimension must be <= 256");
@@ -403,8 +403,10 @@ std::vector<at::Tensor> flash_attention_forward(
 
     // empty case
     if (N == 0) {
+        // Empty KV: upstream flash_api.cpp:501-503 zeroes out and fills lse with +inf
+        // (the empty-sequence sentinel), not -inf.
         out_fp16.zero_();
-        softmax_lse.fill_(-std::numeric_limits<float>::infinity());
+        softmax_lse.fill_(std::numeric_limits<float>::infinity());
         return {out_fp16, softmax_lse, dmask, rng_state};
     }
 

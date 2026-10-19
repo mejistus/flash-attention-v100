@@ -4,41 +4,42 @@ requires = [
     "setuptools>=82.0.1",
     "wheel>=0.46.3",
     "packaging>=26.0",
-    "torch @ https://download-r2.pytorch.org/whl/cu129/torch-2.10.0%2Bcu129-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=a3c703e74a88cccfeb4b1807c49d563a0a73793ba72d4fa035d4ac5885f3aefd",
+    "torch>=2.6.0",
     "ninja>=1.13.0",
     "psutil>=7.2.2",
-    "numpy>=2.4.4"
+    "numpy>=2.0.0"
 ]
 
 
 [project]
-name = "flash_attn_v100"
-version = "26.06"
-description = "Flash Attention 2 for Tesla v100"
+name = "flash-attn"
+version = "2.8.3"
+description = "FlashAttention-2 for NVIDIA Volta GPUs (drop-in flash-attn API)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"
 license-files = ["LICENSE", "AUTHORS"]
 dynamic = ["authors", "classifiers", "urls"]
 dependencies = [
-    "torch @ https://download-r2.pytorch.org/whl/cu129/torch-2.10.0%2Bcu129-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=a3c703e74a88cccfeb4b1807c49d563a0a73793ba72d4fa035d4ac5885f3aefd",
+    "torch>=2.6.0",
+    "einops",
     "setuptools>=82.0.1",
     "wheel>=0.46.3",
     "packaging>=26.0",
     "ninja>=1.13.0",
     "psutil>=7.2.2",
-    "numpy>=2.4.4"
+    "numpy>=2.0.0"
 ]
 
 [tool.setuptools]
-packages = ["flash_attn_v100"]
+packages = ["flash_attn"]
 
 [tool.setuptools.exclude-package-data]
 "*" = [
     "build",
     "kernel",
     "include",
-    "flash_attn_v100.egg-info",
+    "flash_attn.egg-info",
     "*.cu",
     "*.cuh",
     "*.cpp",

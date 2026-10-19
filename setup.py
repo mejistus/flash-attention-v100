@@ -7,13 +7,55 @@ import os
 import shutil
 import pathlib
 from pathlib import Path
-from packaging.version import parse
+try:
+    from packaging.version import parse
+except ImportError:  # `packaging` is not a hard dependency of torch
+    def parse(s):
+        return tuple(int(x) for x in str(s).split(".") if x.isdigit())
 from setuptools import setup
 from setuptools.command.build_py import build_py
-from setuptools.command.install import install
 from torch.utils.cpp_extension import CUDAExtension, BuildExtension
 
 this_dir = Path(__file__).parent.resolve()
+
+
+def _extra_include_dirs():
+    """Include dirs beyond this repo's own `include/`.
+
+    1. CUDA toolkit headers, covering both layouts:
+       - conda `cuda-nvcc` installs: $CONDA_PREFIX/targets/x86_64-linux/include
+       - standard toolkit / pip nvidia-cuda-nvcc: $CUDA_HOME/include
+    2. cuBLAS/cuSPARSE/cuSOLVER headers shipped inside torch's PyPI wheels under
+       site-packages/nvidia/*/include (torch's ATen CUDA headers pull them in even
+       though this project does not call those libraries directly).
+    """
+    dirs = [str(this_dir / "include")]
+    cuda_home = os.environ.get("CUDA_HOME")
+    if cuda_home:
+        for sub in ("include", "targets/x86_64-linux/include"):
+            cand = Path(cuda_home) / sub
+            if cand.is_dir():
+                dirs.append(str(cand))
+    try:
+        import torch as _torch
+
+        site_pkgs = Path(_torch.__file__).resolve().parent.parent
+        nvidia_dir = site_pkgs / "nvidia"
+        if nvidia_dir.is_dir():
+            for pkg in sorted(nvidia_dir.iterdir()):
+                inc = pkg / "include"
+                if inc.is_dir():
+                    dirs.append(str(inc))
+    except Exception as e:
+        print(f"Warning: could not scan nvidia wheel include dirs: {e}")
+    # de-duplicate, keep order
+    seen, out = set(), []
+    for d in dirs:
+        if d not in seen:
+            seen.add(d)
+            out.append(d)
+    return out
+
 
 def auto_tune():
     if os.environ.get("MAX_JOBS") and os.environ.get("NVCC_THREADS"):
@@ -43,8 +85,8 @@ def get_ext_modules():
         from torch.utils.cpp_extension import CUDAExtension
     except ImportError as e:
         raise RuntimeError(
-            "torch is required to build flash_attn_v100. "
-            "Please install torch >= 2.10 first (e.g., `pip install torch==2.10.0+cu129 --index-url https://download.pytorch.org/whl/cu129`)."
+            "torch is required to build flash_attn. "
+            "Please install a CUDA-enabled torch (e.g., `uv pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu126`)."
         ) from e
 
     nvcc_threads = int(os.environ.get("NVCC_THREADS", 4))
@@ -72,6 +114,12 @@ def get_ext_modules():
         ])
         (this_dir / "build").mkdir(exist_ok=True)
 
+    if os.environ.get("FLASH_ATTN_PTXAS_VERBOSE"):
+        # Flags-pure resource report for the release build: identical codegen to the
+        # default build, only ptxas' verbose statistics are enabled. Parsed by
+        # tests/collect_ptxas_stats.py.
+        nvcc_flags.extend(["-Xptxas", "-v"])
+
     if os.environ.get("MMA_NATIVE"):
         nvcc_flags.extend(["-DMMA_NATIVE"])
 
@@ -80,7 +128,7 @@ def get_ext_modules():
 
     return [
         CUDAExtension(
-            name="flash_attn_v100_cuda",
+            name="flash_attn_2_cuda",
             sources=[
                 "kernel/api.cpp",
                 "kernel/forward.cu",
@@ -89,7 +137,7 @@ def get_ext_modules():
                 "kernel/backward_varlen.cu",
                 "kernel/forward_kvcache.cu",
             ],
-            include_dirs=[this_dir / "include"],
+            include_dirs=_extra_include_dirs(),
             extra_compile_args={
                 "cxx": ["-O3", "-std=c++17"],
                 "nvcc": nvcc_flags,
@@ -97,69 +145,46 @@ def get_ext_modules():
         )
     ]
 
-class CopyAttention(build_py):
-    def run(self):
-        super().run()
-        build_lib = self.build_lib
-        this_dir = os.path.dirname(os.path.abspath(__file__))
-
-        src_pkg = os.path.join(this_dir, 'flash_attn')
-        dst_pkg = os.path.join(build_lib, 'flash_attn')
-        if os.path.exists(src_pkg):
-            if os.path.exists(dst_pkg):
-                shutil.rmtree(dst_pkg)
-            shutil.copytree(src_pkg, dst_pkg, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.so'))
-            print(f"Copied package: {src_pkg} -> {dst_pkg}")
-
-class InstallAttention(install):
-    def run(self):
-        install.run(self)
-        import site
-        dst = os.path.join(site.getsitepackages()[0], 'flash_attn-2.8.3.dist-info')
-        if os.path.exists(dst): shutil.rmtree(dst)
-        os.makedirs(dst, exist_ok=True)
-        with open(os.path.join(dst, 'METADATA'), 'w') as f:
-            f.write("Metadata-Version: 2.4\nName: flash-attn\nVersion: 2.8.3\n")
-        with open(os.path.join(dst, 'top_level.txt'), 'w') as f:
-            f.write('flash_attn\n')
 
 def get_cmdclass():
     try:
         from torch.utils.cpp_extension import BuildExtension
     except ImportError as e:
         raise RuntimeError(
-            "torch is required to build flash_attn_v100. "
-            "Please install torch >= 2.10 first (e.g., `pip install torch==2.10.0+cu129 --index-url https://download.pytorch.org/whl/cu129`)."
+            "torch is required to build flash_attn. "
+            "Please install a CUDA-enabled torch (e.g., `uv pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu126`)."
         ) from e
 
     class BuildAttention(BuildExtension):
         def build_extensions(self):
             import torch
 
+            # Minimum CUDA version can be overridden for experiments; CUDA 12.6 is the
+            # oldest toolkit with full Volta (sm_70) support that we validate against.
+            min_cuda = os.environ.get("FLASH_ATTN_MIN_CUDA", "12.6")
+            cuda_ver = torch.version.cuda
+            if cuda_ver is None:
+                raise RuntimeError(
+                    "flash_attn requires a CUDA-enabled PyTorch build (torch.version.cuda is None). "
+                    "Install e.g. `uv pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu126`."
+                )
+            if parse(cuda_ver) < parse(min_cuda):
+                raise RuntimeError(
+                    f"CUDA version {cuda_ver} < {min_cuda} is not supported "
+                    f"(set FLASH_ATTN_MIN_CUDA to override)."
+                )
             if not torch.cuda.is_available():
-                raise RuntimeError("CUDA is required but not available.")
-            if parse(torch.version.cuda) < parse("12.9"):
-                raise RuntimeError(f"CUDA version {torch.version.cuda} < 12.9 is not supported.")
+                # Building does not require a physical GPU. The produced extension targets
+                # sm_70 and is only usable on a Volta GPU at runtime.
+                print(
+                    "Warning: no CUDA device detected at build time. Building without a GPU; "
+                    "the extension will only run on machines with a Volta (sm_70) GPU."
+                )
 
             super().build_extensions()
 
-            try:
-                import pathlib
 
-                src_lib = pathlib.Path(self.get_ext_fullpath("flash_attn_v100_cuda"))
-
-                if src_lib.exists():
-                    dst_lib = src_lib.parent / "flash_attn_2_cuda.so"
-
-                    if dst_lib.exists() or dst_lib.is_symlink():
-                       dst_lib.unlink()
-
-                    dst_lib.symlink_to(src_lib.name)
-                    print(f"Created symlink: {dst_lib.name} -> {src_lib.name}")
-            except Exception as e:
-                print(f"Warning: Failed to create flash_attn_2_cuda.so symlink: {e}")
-
-    return {"build_ext": BuildAttention, "build_py": CopyAttention, 'install': InstallAttention}
+    return {"build_ext": BuildAttention}
 
 try:
     with open(this_dir / "README.md", encoding="utf-8") as f:
@@ -168,16 +193,16 @@ except FileNotFoundError:
     long_description = "Flash Attention implementation for Tesla V100"
 
 setup(
-    name="flash_attn_v100",
-    version="26.06",
-    packages=["flash_attn_v100"],
+    name="flash-attn",
+    version="2.8.3",
+    packages=["flash_attn"],
     ext_modules=get_ext_modules(),
     cmdclass=get_cmdclass(),
     python_requires=">=3.10",
     zip_safe=False,
     author="D.Skryabin",
     author_email="tg @ai_bond007",
-    description="Flash Attention implementation under unsupported Tesla V100",
+    description="FlashAttention-2 for NVIDIA Volta GPUs (drop-in flash-attn API)",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ai-bond/flash-attention-v100",

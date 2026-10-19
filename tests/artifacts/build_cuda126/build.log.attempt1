@@ -1,0 +1,5 @@
+CUDA_HOME=/opt/miniforge/targets/x86_64-linux
+CC=/opt/miniforge/bin/x86_64-conda-linux-gnu-gcc
+MAX_JOBS=8 NVCC_THREADS=4
+scripts/build_cuda126.sh: 列 34: /opt/miniforge/targets/x86_64-linux/bin/nvcc: 沒有此一檔案或目錄
+BUILD_EXIT=127

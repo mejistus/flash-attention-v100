@@ -16,7 +16,7 @@
 #define BLOCK_N_DQ_64   80
 
 #define BLOCK_M_DQ_128  32
-#define BLOCK_N_DQ_128  112
+#define BLOCK_N_DQ_128  64
 
 #define BLOCK_M_DQ_256  32
 #define BLOCK_N_DQ_256  32
@@ -30,8 +30,8 @@
 #define BLOCK_M_DKV_64  32
 #define BLOCK_N_DKV_64  128
 
-#define BLOCK_M_DKV_128 16
-#define BLOCK_N_DKV_128 128
+#define BLOCK_M_DKV_128 32
+#define BLOCK_N_DKV_128 64
 
 #define BLOCK_M_DKV_256 16
 #define BLOCK_N_DKV_256 64

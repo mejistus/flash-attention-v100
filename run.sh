@@ -30,7 +30,7 @@ if [ -n "$MMA_MODE" ]; then
     fi
 fi
 
-pip install . --no-build-isolation -v
+pip install . --no-build-isolation --no-deps -v
 
 if [ "$DEBUG" -eq 1 ] && [ -d "./build" ]; then
     find ./build/ -maxdepth 1 -name "fused_mha_*" ! -name "*.ptx" ! -name "*.cubin" -type f -delete 2>/dev/null || true
@@ -89,4 +89,9 @@ SCRIPT_EOF
     chmod +x ./build/asm_extract.sh
 fi
 
-CUDA_LAUNCH_BLOCKING=1 python test.py
+if python -c "import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)"; then
+    CUDA_LAUNCH_BLOCKING=1 python test.py
+else
+    echo "No CUDA device detected - skipping GPU test.py; running the CPU-runnable test suite instead."
+    python tests/run_all_cpu.py
+fi

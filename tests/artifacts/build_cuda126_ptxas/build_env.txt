@@ -1,0 +1,14 @@
+=== build env snapshot 2026-10-20T01:52:20+08:00 ===
+CONDA_PREFIX=/mnt/envs/v100
+CUDA_HOME=<unset>
+CC=<unset>
+CXX=<unset>
+MAX_JOBS=24
+NVCC_THREADS=<default>
+TORCH_CUDA_ARCH_LIST=<unset>
+FLASH_ATTN_V100_ALLOW_NO_GPU=<unset>
+Cuda compilation tools, release 12.6, V12.6.85
+Build cuda_12.6.r12.6/compiler.35059454_0
+torch 2.6.0+cu126 | cuda 12.6
+python 3.12.15
+x86_64-conda-linux-gnu-gcc (conda-forge gcc 12.4.0-2) 12.4.0
