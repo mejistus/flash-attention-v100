@@ -1,0 +1,16 @@
+{
+ "mode": "flash",
+ "batch": 16,
+ "steps": 30,
+ "lora_rank": 64,
+ "trainable_params": 47442120,
+ "ms_per_step": 394.5041961669922,
+ "samples_per_s": 40.55723654008298,
+ "peak_mib": 13220.1435546875,
+ "loss_first": 5.263017177581787,
+ "loss_last": 3.789299964904785,
+ "val_acc": 0.6982421875,
+ "data_prep_s": 40.64852595329285,
+ "torch": "2.8.0+cu128",
+ "device": "Tesla V100S-PCIE-32GB"
+}

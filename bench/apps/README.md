@@ -19,6 +19,9 @@ All code and data live on the AutoDL server under `/root/autodl-tmp`:
 * PyTorch **2.8.0+cu128**, CUDA runtime 12.8, Python 3.12
 * `transformers` 5.20.1, `diffusers` 0.41.0, `peft` 0.21.2, `datasets` 5.1.0, `modelscope` 1.40.2
 * `flash_attn` **2.8.3** (this repository, imported as `flash_attn` / `flash_attn_2_cuda`)
+* The measurements below were rerun with the **API-aligned wheel** (`v2.8.3-v100-api`) in
+  `/root/autodl-tmp/envs/api28`; the earlier custom-interface numbers are kept in
+  `results/*.json` as a cross-check.
 
 ## Models and datasets (domestic mirrors)
 
@@ -68,23 +71,25 @@ PY
 
 ```bash
 cd /root/autodl-tmp/code
-/root/autodl-tmp/envs/task/bin/python dinov3-finetuning.py \
+/root/autodl-tmp/envs/api28/bin/python dinov3-finetuning.py \
     --batch 16 --steps 30 --warmup 5 --train-size 4096 --val-size 1024
-/root/autodl-tmp/envs/task/bin/python dinov3-finetuning-flash.py \
+/root/autodl-tmp/envs/api28/bin/python dinov3-finetuning-flash.py \
     --batch 16 --steps 30 --warmup 5 --train-size 4096 --val-size 1024
 ```
 
 | Metric | SDPA | FlashAttention | Δ |
 | --- | ---: | ---: | ---: |
-| ms / training step | 393.10 | 393.72 | +0.16 % |
-| samples / s | 40.70 | 40.64 | −0.15 % |
+| ms / training step (mean of 2 runs) | 386.75 | 394.60 | +2.03 % |
+| samples / s | 41.37 | 40.55 | −1.99 % |
 | peak GPU memory | 13 198.7 MiB | 13 220.1 MiB | +21.4 MiB |
-| loss (first → last) | 5.263 → 3.830 | 5.263 → 3.807 | ≈ same |
-| val accuracy (1024 imgs) | 73.44 % | 70.61 % | noise, 30 steps |
+| loss (first → last) | 5.263 → 3.788–3.853 | 5.263 → 3.789–3.842 | ≈ same |
+| val accuracy (1024 imgs) | 71.6–73.3 % | 69.8–71.6 % | noise, 30 steps |
 
-**Result: at 224×224 (201 tokens) the attention kernel is a small fraction of ViT-H
-compute; this sm_70 FlashAttention build is performance-neutral for DINOv3 LoRA
-fine-tuning (within 0.2 %), with identical memory.**
+Run-to-run values: SDPA 386.40 / 387.11 ms, flash 394.70 / 394.50 ms.  The earlier
+custom-interface run measured 393.10 vs 393.72 ms (+0.16 %).  The flash absolute
+time is stable (~394.6 ms in both runs); the SDPA baseline shifted with the
+environment/GPU clocks, so read the training delta as **~0–2 %** — no meaningful
+speedup, identical memory.
 
 ### SD3.5-Medium text-to-image
 
@@ -93,40 +98,62 @@ fine-tuning (within 0.2 %), with identical memory.**
 
 ```bash
 cd /root/autodl-tmp/code
-/root/autodl-tmp/envs/task/bin/python sd35m-gen.py       --steps 20 --iters 3 --warmup 1
-/root/autodl-tmp/envs/task/bin/python sd35m-gen-flash.py --steps 20 --iters 3 --warmup 1
+/root/autodl-tmp/envs/api28/bin/python sd35m-gen.py       --steps 20 --iters 3 --warmup 1
+/root/autodl-tmp/envs/api28/bin/python sd35m-gen-flash.py --steps 20 --iters 3 --warmup 1
 ```
 
 | Metric | SDPA | FlashAttention | Δ |
 | --- | ---: | ---: | ---: |
-| ms / 512×512 image | 2 764.6 | 2 994.4 | **+8.31 %** |
-| images / s | 0.3617 | 0.3340 | −7.7 % |
+| ms / 512×512 image | 2 768.6 | 3 005.2 | **+8.55 %** |
+| images / s | 0.3612 | 0.3328 | −7.9 % |
 | peak GPU memory | 18 106.3 MiB | 18 106.3 MiB | 0 |
 
 Output quality: PSNR between the two same-seed images is **42.46 dB** (MSE 3.69,
 max channel diff 66), i.e. visually equivalent; differences come from fp16
 non-determinism between the two attention kernels.
 
-**Result: for SD3.5-Medium generation on V100 the FlashAttention path is ~8 %
-slower than PyTorch SDPA, with no memory change.** The attention workload
-(short joint sequences, single image) does not amortize the kernel's overhead;
-the pipeline is dominated by the MMDiT/VAE layers and text encoders.
+**Result: for SD3.5-Medium generation on V100 the FlashAttention path is ~8.5 %
+slower than PyTorch SDPA, with no memory change** (previous custom-interface run:
++8.31 %; the API-aligned package adds ~0.36 % to the flash path).  The attention
+workload (short joint sequences, single image) does not amortize the kernel's
+overhead; the pipeline is dominated by the MMDiT/VAE layers and text encoders.
+
+## Inference vs LoRA training (summary)
+
+Both rows use the same V100S-32GB and torch 2.8.0+cu128 environment (API-aligned
+wheel).  Absolute milliseconds are not comparable between the two different
+workloads; the meaningful number is the in-row FlashAttention vs SDPA delta.
+
+| workload | mode | SDPA | FlashAttention | Δ |
+| --- | --- | ---: | ---: | ---: |
+| DINOv3-H LoRA(64), 224 px, batch 16 | training (fwd+bwd+AdamW) | 386.8 ms/step, 41.37 samples/s, 13.2 GiB | 394.6 ms/step, 40.55 samples/s, 13.2 GiB | +2.0 % |
+| SD3.5-Medium, 512×512, 20 steps | inference | 2 768.6 ms/image, 0.3612 images/s, 17.7 GiB | 3 005.2 ms/image, 0.3328 images/s, 17.7 GiB | +8.6 % |
+
+**Conclusion:** on V100, FlashAttention is not a speed win for either workload:
+LoRA training is ~neutral (0–2 % depending on run/environment) and SD3.5 inference
+is consistently ~8.5 % slower; peak memory is unchanged.  The kernel's advantage
+remains large-batch/long-sequence and packed-varlen training memory (top-level
+README).
 
 ## Analysis / known limitations
 
-* Both tasks are **inference/short-sequence** workloads. The repo's earlier
-  micro-benchmarks (`bench/bench_pareto.py`) show the kernel's advantage at large
-  batch/sequence and in training backward; these app workloads do not hit that regime.
+* DINOv3 training uses short 201-token sequences; SD3.5 is single-image inference.
+  The repo's earlier micro-benchmarks (`bench/bench_pareto.py`) show the kernel's
+  advantage at large batch/sequence and in training backward; these app workloads
+  do not hit that regime.
 * DINOv3-H in pure fp16 produced NaN logits on V100; the benchmark uses fp32
   weights + AMP fp16 for both backends, so the comparison is fair but not the
   fastest possible configuration.
-* `diffusers` 0.41 probes `flash_attn.flash_attn_interface._wrapped_flash_attn_forward/backward`
-  for its built-in "flash" backend and falls back to SDPA when they are absent.
-  The four scripts do **not** depend on that private API: the flash variants patch
-  the SDPA/attention call sites directly. This is noted as a drop-in-compatibility gap.
+* With the API-aligned wheel the official `_wrapped_flash_attn_forward/backward`
+  custom ops exist, so `diffusers` 0.41 detects flash-attn instead of falling back
+  to SDPA.  The four scripts still route SDPA/attention directly for an
+  apples-to-apples benchmark.
 * TinyImageNet images are 64×64 and are resized to 224×224 by the DINOv3 image
   processor; the benchmark measures compute, not accuracy convergence (30 steps).
 * Multi-version wheels (CUDA 12.8/torch 2.8.0, CUDA 12.6/torch 2.6.0, CUDA
-  12.4/torch 2.5.1) are published on the `v2.8.3` release; see the top-level
-  `README.md` compatibility matrix. The request's `torch 1.6.0` is treated as a
-  typo for **2.6.0** (torch 1.6 cannot run with CUDA 12.x / Python 3.12).
+  12.4/torch 2.5.1) are published on the `v2.8.3-v100-api` release; see the
+  top-level `README.md` compatibility matrix. The request's `torch 1.6.0` is
+  treated as a typo for **2.6.0** (torch 1.6 cannot run with CUDA 12.x / Python 3.12).
+* API-alignment overhead: flash path 393.72→394.60 ms/step (training, +0.22 %)
+  and 2 994.4→3 005.2 ms/image (inference, +0.36 %); the SDPA script does not use
+  flash-attn, so its absolute shift between envs is environment/clock variance.

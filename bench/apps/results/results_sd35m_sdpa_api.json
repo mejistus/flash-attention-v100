@@ -1,0 +1,17 @@
+{
+ "mode": "sdpa",
+ "steps": 20,
+ "size": [
+  512,
+  512
+ ],
+ "seed": 1234,
+ "ms_per_image": 2768.569580078125,
+ "images_per_s": 0.36119735158391125,
+ "peak_mib": 18106.322265625,
+ "warmup": 1,
+ "iters": 3,
+ "image": "/root/autodl-tmp/code/sd35m_sdpa.png",
+ "torch": "2.8.0+cu128",
+ "device": "Tesla V100S-PCIE-32GB"
+}

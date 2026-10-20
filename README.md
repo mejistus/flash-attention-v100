@@ -188,13 +188,15 @@ identical hyper-parameters, run on the same V100S-32GB / torch 2.8.0+cu128 setup
 
 | workload | PyTorch SDPA | this build | difference |
 |----------|-------------:|-----------:|-----------:|
-| DINOv3-H LoRA(64), 224 px, batch 16 | 393.1 ms/step, 13.2 GiB | 393.7 ms/step, 13.2 GiB | +0.16 % |
-| SD3.5-Medium, 512×512, 20 steps | 2764.6 ms/image, 17.7 GiB | 2994.4 ms/image, 17.7 GiB | +8.31 % |
+| DINOv3-H LoRA(64), 224 px, batch 16 | 386.8 ms/step, 13.2 GiB | 394.6 ms/step, 13.2 GiB | +2.03 % |
+| SD3.5-Medium, 512×512, 20 steps | 2768.6 ms/image, 17.7 GiB | 3005.2 ms/image, 17.7 GiB | +8.55 % |
 
-At these short-sequence / inference workloads attention is not the bottleneck; the
-repo's advantage is memory at large batch/sequence (table above). The two generated
-images are visually equivalent (PSNR 42.46 dB). Scripts, logs, JSON results and the
-PNG outputs are committed under `bench/apps/`.
+DINOv3 LoRA training is essentially neutral (0–2 % depending on run/environment);
+SD3.5 inference is consistently ~8.5 % slower with flash-attn on V100. Attention
+is not the bottleneck in these short-sequence workloads; the repo's advantage is
+memory at large batch/sequence (table above). The two generated images are visually
+equivalent (PSNR 42.46 dB). Scripts, logs, JSON results and the PNG outputs are
+committed under `bench/apps/`.
 
 ## Verification
 
