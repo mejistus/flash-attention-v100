@@ -35,7 +35,9 @@ class _StubBackend:
     def bwd(self, dout, q, k, v, out, lse, dq, dk, dv, alibi_slopes, p_dropout,
             softmax_scale, is_causal, window_left, window_right, softcap,
             deterministic, gen, rng_state):
-        self.calls.append(dict(kind="bwd", dropout_p=p_dropout, causal=is_causal))
+        self.calls.append(dict(kind="bwd", dropout_p=p_dropout, causal=is_causal,
+                               window_left=window_left, window_right=window_right,
+                               softcap=softcap, deterministic=deterministic))
         return torch.empty_like(dq), torch.empty_like(dk), torch.empty_like(dv), torch.empty(0)
 
     # ----------------------------------------------------------------- varlen --
@@ -62,7 +64,10 @@ class _StubBackend:
                    cu_seqlens_k, alibi_slopes, max_seqlen_q, max_seqlen_k, p_dropout,
                    softmax_scale, zero_tensors, is_causal, window_left, window_right,
                    softcap, deterministic, gen, rng_state):
-        self.calls.append(dict(kind="varlen_bwd"))
+        self.calls.append(dict(kind="varlen_bwd", dropout_p=p_dropout,
+                               causal=is_causal, window_left=window_left,
+                               window_right=window_right, softcap=softcap,
+                               deterministic=deterministic))
         return torch.empty_like(dq), torch.empty_like(dk), torch.empty_like(dv), torch.empty(0)
 
     # ---------------------------------------------------------------- kvcache --
@@ -106,6 +111,41 @@ def install_stub(force=False):
     mod.stub_backend = stub
     sys.modules["flash_attn_2_cuda"] = mod
     return mod, True
+
+
+def install_cpu_dispatch():
+    """Route the official wrapper's custom-op calls to their Python backends on CPU.
+
+    Upstream registers ``torch.ops.flash_attn._flash_attn_*`` with
+    ``device_types="cuda"``.  Registering a CPU kernel is not sufficient for the
+    wrapper tests here: custom-op kernels execute below autograd's dispatch keys,
+    so a mock backward that needs to build its own reference graph cannot use
+    ``torch.autograd.grad``.  Instead, replace the module-level ``_wrapped_*``
+    handles with the custom ops' plain Python implementations (which call
+    ``flash_attn_2_cuda`` directly, i.e. the real extension or the stub/mock).
+    This is a test-harness shim; it does not change the package's public API.
+
+    Must be called *after* ``import flash_attn``.  Returns the number of wrapper
+    handles installed.
+    """
+    import flash_attn.flash_attn_interface as fai
+
+    pairs = {
+        "_wrapped_flash_attn_forward": "_flash_attn_forward",
+        "_wrapped_flash_attn_varlen_forward": "_flash_attn_varlen_forward",
+        "_wrapped_flash_attn_backward": "_flash_attn_backward",
+        "_wrapped_flash_attn_varlen_backward": "_flash_attn_varlen_backward",
+    }
+    installed = 0
+    for wrapped_name, impl_name in pairs.items():
+        impl = getattr(fai, impl_name)
+        backend_fns = getattr(impl, "_backend_fns", None)
+        if backend_fns and "cuda" in backend_fns:
+            # CustomOpDef: unwrap the Python function registered for CUDA.
+            impl = backend_fns["cuda"]
+        setattr(fai, wrapped_name, impl)
+        installed += 1
+    return installed
 
 
 class _Result:

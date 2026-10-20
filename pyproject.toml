@@ -31,9 +31,6 @@ dependencies = [
     "numpy>=2.0.0"
 ]
 
-[tool.setuptools]
-packages = ["flash_attn"]
-
 [tool.setuptools.exclude-package-data]
 "*" = [
     "build",

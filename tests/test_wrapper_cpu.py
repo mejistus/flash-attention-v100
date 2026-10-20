@@ -61,11 +61,14 @@ from flash_attn.flash_attn_interface import (  # noqa: E402
     flash_attn_func,
     flash_attn_gpu,
     flash_attn_varlen_func,
-    flash_attn_varlen_gpu,
     flash_attn_with_kvcache,
-    flash_attn_with_kvcache_gpu,
     round_multiple,
 )
+from _stub_cuda_backend import install_cpu_dispatch  # noqa: E402
+
+# Upstream's torch.library custom ops are CUDA-only; route the wrapper's calls to
+# their Python implementations, which forward to flash_attn_2_cuda (the mock here).
+install_cpu_dispatch()
 
 torch.manual_seed(0)
 
@@ -228,11 +231,15 @@ def test_import_surface():
     )
     assert f1 is flash_attn_func and f2 is flash_attn_varlen_func and f3 is flash_attn_with_kvcache
     from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa: F401
-    import flash_attn_2_cuda  # the .so symlink alias must be importable
+    import flash_attn_2_cuda  # real extension or the CPU test stub
     assert flash_attn_2_cuda.fwd is not None
     assert hasattr(flash_attn_gpu, "fwd")  # official: the extension module, not a function alias
-    assert flash_attn_varlen_gpu is flash_attn_varlen_func
-    assert flash_attn_with_kvcache_gpu is flash_attn_with_kvcache
+    assert flash_attn_func is flash_attn.flash_attn_func
+    assert flash_attn_varlen_func is flash_attn.flash_attn_varlen_func
+    assert flash_attn_with_kvcache is flash_attn.flash_attn_with_kvcache
+    # The fork-only aliases no longer exist in the official surface.
+    assert not hasattr(flash_attn, "flash_attn_varlen_gpu")
+    assert not hasattr(flash_attn, "flash_attn_with_kvcache_gpu")
     assert mock_cuda.is_installed()
 
 
@@ -489,12 +496,15 @@ def test_dense_dropout_shape_only():
 
 
 @test
-def test_deterministic_warning():
+def test_deterministic_no_warning():
+    # Official 2.8.3 accepts deterministic=True silently in the forward pass; the
+    # flag only selects the backward algorithm.
     q, k, v = (rand_bmhd(1, 4, 2, 32) for _ in range(3))
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        flash_attn_func(q, k, v, deterministic=True, causal=True)
-    assert any(issubclass(x.category, RuntimeWarning) for x in w), [x.category for x in w]
+        out = flash_attn_func(q, k, v, deterministic=True, causal=True)
+    assert not any(issubclass(x.category, RuntimeWarning) for x in w), [x.category for x in w]
+    assert out.shape == q.shape
 
 
 @test
@@ -528,7 +538,7 @@ def _varlen_inputs(lens_q, lens_k, H, H_K, D, dtype=torch.float16):
 
 
 @test
-def test_varlen_basic_and_int32_conversion():
+def test_varlen_basic_and_cu_forwarding():
     lens_q = [3, 1, 7]
     lens_k = [3, 1, 9]
     q, k, v, cu_q, cu_k = _varlen_inputs(lens_q, lens_k, 2, 2, 32)
@@ -536,11 +546,12 @@ def test_varlen_basic_and_int32_conversion():
     assert out.shape == (sum(lens_q), 2, 32) and out.dtype == torch.float16
     ref, lse_ref = ref_varlen_from_flat(q, k, v, cu_q, cu_k, causal=True)
     close("varlen", out, ref)
-    # wrapper must convert cu_seqlens to int32 before the extension call
+    # Official 2.8.3 forwards cu_seqlens unchanged; it does not cast int64 -> int32.
     call = mock_cuda.last_call("varlen_fwd")
     (_, cuq_shp, cuq_dtype) = call["args"][4]
-    assert cuq_dtype == "torch.int32" and cuq_shp == (4,)
-    assert call["args"][10] == max(lens_q) and call["args"][11] == max(lens_k)
+    assert cuq_dtype == str(cu_q.dtype) and cuq_shp == (4,)
+    # The V100 compat shim may round max_seqlen up to a kernel alignment.
+    assert call["args"][10] >= max(lens_q) and call["args"][11] >= max(lens_k)
 
 
 @test

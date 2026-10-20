@@ -22,6 +22,18 @@ mod, _ = sb.install_stub(force=True)
 backend = mod.stub_backend
 R = sb.RESULT
 
+import flash_attn  # noqa: E402
+import flash_attn.flash_attn_interface as fai  # noqa: E402
+from flash_attn import (  # noqa: E402
+    flash_attn_func, flash_attn_varlen_func, flash_attn_with_kvcache,
+    flash_attn_qkvpacked_func, flash_attn_kvpacked_func,
+    flash_attn_varlen_qkvpacked_func, flash_attn_varlen_kvpacked_func,
+)
+
+# Upstream's torch.library custom ops are CUDA-only; route the wrapper's calls
+# to their Python implementations so the official wrapper runs against the stub.
+sb.install_cpu_dispatch()
+
 
 def last():
     return backend.calls[-1]
@@ -121,31 +133,70 @@ def test_dense_return_attn_probs():
 
 
 def test_dense_empty():
+    # Official 2.8.3 has no Python-side empty-input early returns, and the V100
+    # shim preserves that wherever the extension can run:
+    #   * B==0 forward is forwarded (the compiled extension then rejects it with
+    #     "batch size must be positive", exactly like upstream; the stub records
+    #     the call instead of raising);
+    #   * M==0 dense calls raise a clear RuntimeError (the V100 kernel cannot
+    #     launch the backward; see test_empty_backward_no_crash);
+    #   * varlen T_Q==0 and max_seqlen_k==0 forwards are forwarded.
+    # Two short-circuits exist only because the V100 kernel cannot launch:
+    #   * dense N==0 forward returns zeros, lse=+inf and a correctly shaped mask
+    #     without calling the backend (upstream's empty-KV semantics);
+    #   * dense M==0 backward returns zero gradients without calling the backend
+    #     (covered in test_empty_backward_no_crash below).
     n0 = ncalls()
     q = torch.randn(0, 4, 2, 8, dtype=torch.float16)
     out = flash_attn_func(q, q, q)
-    (R.ok if (out.shape == (0, 4, 2, 8) and ncalls() == n0) else R.fail)(
-        "dense: B==0 early return (no backend call, right shape)",
+    (R.ok if (out.shape == (0, 4, 2, 8) and ncalls() == n0 + 1) else R.fail)(
+        "dense: B==0 forwarded to backend, output shape preserved",
         f"out={tuple(out.shape)}, calls+{ncalls()-n0}")
+    n1 = ncalls()
     r = flash_attn_func(q, q, q, return_attn_probs=True)
-    (R.ok if (len(r) == 3 and r[1].shape == (0, 2, 4) and r[2].numel() == 0) else R.fail)(
-        "dense: B==0 + return_attn_probs shapes")
-    q = torch.randn(2, 0, 3, 8, dtype=torch.float16)
-    out = flash_attn_func(q, q, q)
-    (R.ok if (out.shape == (2, 0, 3, 8) and ncalls() == n0) else R.fail)(
-        "dense: M==0 early return")
+    (R.ok if (len(r) == 3 and r[1].shape == (0, 2, 4) and r[2].numel() == 0
+              and ncalls() == n1 + 1) else R.fail)(
+        "dense: B==0 + return_attn_probs shapes (backend called)")
 
-    # N == 0: official semantics -> zeroed output, lse = +inf
+    # M == 0: the V100 kernel cannot launch the backward, so the adapter raises
+    # a clear RuntimeError before any backend call.
+    n2 = ncalls()
+    q = torch.randn(2, 0, 3, 8, dtype=torch.float16)
+    k = torch.randn(2, 4, 3, 8, dtype=torch.float16)
+    v = torch.randn(2, 4, 3, 8, dtype=torch.float16)
+    try:
+        flash_attn_func(q, k, v)
+        R.fail("dense: M==0 raises cleanly (V100 limitation)", "no exception")
+    except RuntimeError as e:
+        (R.ok if "M == 0" in str(e) and ncalls() == n2 else R.fail)(
+            "dense: M==0 raises cleanly (V100 limitation)", str(e)[:80])
+
+    # N == 0: shim short-circuit (zeroes/+inf), no backend call.
     q = torch.randn(2, 4, 3, 8, dtype=torch.float16)
     k = torch.randn(2, 0, 3, 8, dtype=torch.float16)
+    n3 = ncalls()
     out = flash_attn_func(q, k, k)
     (R.ok if (out.shape == (2, 4, 3, 8) and int(out.count_nonzero()) == 0
-              and ncalls() == n0) else R.fail)(
-        "dense: N==0 -> zeroed out, no backend call")
+              and ncalls() == n3) else R.fail)(
+        "dense: N==0 short-circuit -> zero output, no backend call",
+        f"out={tuple(out.shape)}, calls+{ncalls()-n3}")
+    n4 = ncalls()
     r = flash_attn_func(q, k, k, return_attn_probs=True)
-    (R.ok if (bool(torch.isinf(r[1]).all()) and bool((r[1] > 0).all())
-              and int(r[0].count_nonzero()) == 0) else R.fail)(
-        "dense: N==0 -> lse = +inf (official parity)")
+    (R.ok if (len(r) == 3 and r[0].shape == (2, 4, 3, 8)
+              and int(r[0].count_nonzero()) == 0
+              and r[1].shape == (2, 3, 4)
+              and bool(torch.isinf(r[1]).all()) and bool((r[1] > 0).all())
+              and r[2].numel() == 0 and ncalls() == n4) else R.fail)(
+        "dense: N==0 short-circuit -> lse=+inf, empty mask, no backend call")
+    # dropout>0 makes the wrapper request S_dmask; with N==0 the mask is
+    # still correctly shaped (B, H, round128(M), round128(N)) and empty.
+    n5 = ncalls()
+    r = flash_attn_func(q, k, k, dropout_p=0.1, return_attn_probs=True)
+    (R.ok if (len(r) == 3 and r[2].shape == (2, 3, 128, 0)
+              and r[2].numel() == 0 and bool(torch.isinf(r[1]).all())
+              and ncalls() == n5) else R.fail)(
+        "dense: N==0 short-circuit -> correctly shaped empty S_dmask",
+        f"mask={tuple(r[2].shape)}")
 
 
 def test_dense_misc():
@@ -170,11 +221,18 @@ def test_dense_misc():
     for name, ok in checks:
         (R.ok if ok else R.fail)("dense misc: " + name)
 
+    # Official 2.8.3: deterministic only selects the backward algorithm; it is
+    # accepted silently in the forward pass and has no warning.
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        flash_attn_func(q, q, q, deterministic=True)
+        out_det = flash_attn_func(q, q, q, deterministic=True)
         got = any(issubclass(x.category, RuntimeWarning) for x in w)
-    (R.ok if got else R.fail)("dense: deterministic=True warns (unsupported)")
+    checks = [
+        ("deterministic=True accepted without warning", not got),
+        ("deterministic=True forward shape", out_det.shape == q.shape),
+    ]
+    for name, ok in checks:
+        (R.ok if ok else R.fail)("dense misc: " + name)
 
 
 def test_dense_backward():
@@ -183,7 +241,8 @@ def test_dense_backward():
     v = torch.randn(2, 4, 2, 10, dtype=torch.float32, requires_grad=True)
     q.retain_grad()
     try:
-        out = flash_attn_func(q, k, v, dropout_p=0.3, causal=True)
+        out = flash_attn_func(q, k, v, dropout_p=0.3, causal=True,
+                              deterministic=True)
         out.sum().backward()
         cb = [c for c in backend.calls if c["kind"] == "bwd"][-1]
         checks = [
@@ -191,6 +250,7 @@ def test_dense_backward():
             ("backward called", True),
             ("dropout forwarded to backward", cb["dropout_p"] == 0.3),
             ("causal forwarded to backward", cb["causal"] is True),
+            ("deterministic forwarded to backward", cb["deterministic"] is True),
             ("dq shape matches q", q.grad is not None and q.grad.shape == q.shape),
             ("dk shape matches k", k.grad is not None and k.grad.shape == k.shape),
             ("dv shape matches v", v.grad is not None and v.grad.shape == v.shape),
@@ -213,10 +273,15 @@ def test_varlen_basic():
     c = last()
     checks = [
         ("q shape (T,H,Dpad)", c["q"].shape == (10, 2, 16)),
-        ("cu_seqlens cast to int32", c["cu_seqlens_q"].dtype == torch.int32
+        # Official 2.8.3 forwards cu_seqlens unchanged (no fork-only int32 cast);
+        # callers are expected to pass int32 as documented.
+        ("cu_seqlens forwarded unchanged", c["cu_seqlens_q"].dtype == cu.dtype
          and c["cu_seqlens_q"].tolist() == [0, 4, 10]),
         ("cu_seqlens_k forwarded", c["cu_seqlens_k"].tolist() == [0, 4, 10]),
-        ("max_seqlen forwarded", c["max_seqlen_q"] == 6 and c["max_seqlen_k"] == 6),
+        # The V100 compat shim may round max_seqlen up to a kernel alignment; the
+        # official wrapper must pass at least the requested maximum through.
+        ("max_seqlen forwarded", c["max_seqlen_q"] >= 6 and c["max_seqlen_k"] >= 6
+         and c["max_seqlen_q"] == c["max_seqlen_k"]),
         ("default scale from original head dim", abs(c["softmax_scale"] - 10 ** -0.5) < 1e-12),
         ("dropout=0 -> return_softmax False", c["return_softmax"] is False),
         ("seqused_k/leftpad_k None", c["seqused_k"] is None and c["leftpad_k"] is None),
@@ -238,34 +303,43 @@ def test_varlen_return_attn_probs():
               and r[2].numel() == 0) else R.fail)("varlen return_attn_probs: dropout=0 gate")
     r = flash_attn_varlen_func(q, q, q, cu, cu, 6, 6, dropout_p=0.1, return_attn_probs=True)
     c = last()
-    (R.ok if (len(r) == 3 and c["return_softmax"] is True and r[2].shape == (10, 2, 6)) else R.fail)(
-        "varlen return_attn_probs: dropout>0 dmask (T,H,maxk)")
+    # Official varlen S_dmask is (batch, nheads, round128(max_q), round128(max_k)),
+    # not the fork's packed (total_q, nheads, max_k) layout.
+    (R.ok if (len(r) == 3 and c["return_softmax"] is True and r[2].ndim == 4
+              and r[2].shape[:2] == (2, 2)
+              and r[2].shape[-2] >= 6 and r[2].shape[-1] >= 6) else R.fail)(
+        "varlen return_attn_probs: dropout>0 dmask (B,H,seqlen_q,seqlen_k)",
+        f"shape={tuple(r[2].shape)}")
 
 
 def test_varlen_empty_and_backward():
+    # Official 2.8.3 forwards empty varlen batches to the kernel (no Python-side
+    # early return); only the output/return shapes are a wrapper contract.
     n0 = ncalls()
     q = torch.randn(0, 2, 10, dtype=torch.float16)
     cu = torch.tensor([0], dtype=torch.int32)
     out = flash_attn_varlen_func(q, q, q, cu, cu, 0, 0)
-    (R.ok if (out.shape == (0, 2, 10) and ncalls() == n0) else R.fail)(
-        "varlen: T_Q==0 early return (no backend call)")
+    (R.ok if (out.shape == (0, 2, 10) and ncalls() == n0 + 1) else R.fail)(
+        "varlen: T_Q==0 forwarded to backend, output shape preserved")
+    n1 = ncalls()
     r = flash_attn_varlen_func(q, q, q, cu, cu, 0, 0, return_attn_probs=True)
-    (R.ok if (len(r) == 3 and r[1].shape == (2, 0)) else R.fail)(
-        "varlen: T_Q==0 return_attn_probs shapes")
+    (R.ok if (len(r) == 3 and r[1].shape == (2, 0) and r[2].numel() == 0
+              and ncalls() == n1 + 1) else R.fail)(
+        "varlen: T_Q==0 return_attn_probs shapes (backend called)")
 
-    # max_seqlen_k == 0: official semantics -> zeroed out, lse = +inf
     q = torch.randn(6, 2, 8, dtype=torch.float16)
     k = torch.randn(0, 2, 8, dtype=torch.float16)
     cu_q = torch.tensor([0, 3, 6], dtype=torch.int32)
     cu_k = torch.tensor([0, 0, 0], dtype=torch.int32)
-    n0 = ncalls()
+    n2 = ncalls()
     out = flash_attn_varlen_func(q, k, k, cu_q, cu_k, 3, 0)
-    (R.ok if (out.shape == (6, 2, 8) and int(out.count_nonzero()) == 0
-              and ncalls() == n0) else R.fail)(
-        "varlen: max_seqlen_k==0 -> zeroed out, no backend call")
+    (R.ok if (out.shape == (6, 2, 8) and ncalls() == n2 + 1) else R.fail)(
+        "varlen: max_seqlen_k==0 forwarded to backend, output shape preserved")
+    n3 = ncalls()
     r = flash_attn_varlen_func(q, k, k, cu_q, cu_k, 3, 0, return_attn_probs=True)
-    (R.ok if (bool(torch.isinf(r[1]).all()) and bool((r[1] > 0).all())) else R.fail)(
-        "varlen: max_seqlen_k==0 -> lse = +inf")
+    (R.ok if (len(r) == 3 and r[1].shape == (2, 6) and r[2].numel() == 0
+              and ncalls() == n3 + 1) else R.fail)(
+        "varlen: max_seqlen_k==0 return_attn_probs shapes (backend called)")
 
     q = torch.randn(10, 2, 10, dtype=torch.float32, requires_grad=True)
     k = torch.randn(10, 2, 10, dtype=torch.float32, requires_grad=True)
@@ -289,22 +363,25 @@ def test_varlen_empty_and_backward():
 
 
 def test_empty_backward_no_crash():
-    """F-2 (research/07): empty-input forwards must stay differentiable-safe.
+    """Official 2.8.3 keeps empty inputs differentiable end-to-end.
 
-    The early returns skip save_for_backward, so autograd reaches the custom backward
-    with an empty ctx.saved_tensors. The guard must return one None per forward input
-    (12 dense / 17 varlen) instead of crashing with ValueError. The recording stub
-    proves no backend backward call is made for these disconnected outputs.
+    There are no Python-side early returns, so autograd saves the forward tensors
+    and calls the backend backward even for empty batches.  The recording stub
+    checks that the backward op is reached exactly once and that autograd does not
+    raise while wiring the empty gradients.
     """
 
-    def run(name, fn):
+    def run(name, fn, allowed_bwd=(1,)):
         n_before = ncalls()
         try:
             fn()
-            no_bwd = not [c for c in backend.calls[n_before:]
-                          if c["kind"] in ("bwd", "varlen_bwd")]
-            (R.ok if no_bwd else R.fail)("empty backward: " + name,
-                                         "" if no_bwd else "backend backward was called")
+            bwd_calls = [c for c in backend.calls[n_before:]
+                         if c["kind"] in ("bwd", "varlen_bwd")]
+            ok = len(bwd_calls) in allowed_bwd
+            (R.ok if ok else R.fail)(
+                "empty backward: " + name,
+                "" if ok else
+                f"{len(bwd_calls)} backend backward calls (allowed {allowed_bwd})")
         except Exception as e:  # noqa: BLE001
             R.fail("empty backward: " + name, f"{type(e).__name__}: {e}")
 
@@ -312,18 +389,34 @@ def test_empty_backward_no_crash():
     q = torch.randn(0, 4, 2, 8, dtype=torch.float16, requires_grad=True)
     run("dense B==0 sum().backward() no crash", lambda: flash_attn_func(q, q, q).sum().backward())
 
-    # dense M == 0
+    # dense M == 0: the V100 kernel cannot launch the backward, so the adapter
+    # rejects the forward with a clear RuntimeError before any backend call.
     q = torch.randn(2, 0, 3, 8, dtype=torch.float16, requires_grad=True)
-    run("dense M==0 sum().backward() no crash", lambda: flash_attn_func(q, q, q).sum().backward())
+    k = torch.randn(2, 4, 3, 8, dtype=torch.float16, requires_grad=True)
+    v = torch.randn(2, 4, 3, 8, dtype=torch.float16, requires_grad=True)
+    try:
+        flash_attn_func(q, k, v)
+        R.fail("empty backward: dense M==0 raises cleanly", "no exception")
+    except RuntimeError as e:
+        (R.ok if "M == 0" in str(e) else R.fail)(
+            "empty backward: dense M==0 raises cleanly", str(e)[:80])
 
-    # dense N == 0 (k/v shaped (2, 0, 3, 8))
+    # dense N == 0 (k/v shaped (2, 0, 3, 8)): the shim forwards this backward
+    # (the V100 extension supports it), but an empty autograd graph may also
+    # produce no backend call.  Either is acceptable; shapes must stay correct.
     q = torch.randn(2, 4, 3, 8, dtype=torch.float16, requires_grad=True)
     k = torch.randn(2, 0, 3, 8, dtype=torch.float16, requires_grad=True)
-    run("dense N==0 sum().backward() no crash", lambda: flash_attn_func(q, k, k).sum().backward())
 
-    # dense N == 0 + return_attn_probs
-    run("dense N==0 return_attn_probs .sum().backward() no crash",
-        lambda: flash_attn_func(q, k, k, return_attn_probs=True)[0].sum().backward())
+    def dense_n0_backward(return_probs=False):
+        out = flash_attn_func(q, k, k, return_attn_probs=return_probs)
+        out[0].sum().backward()
+        assert q.grad is not None and q.grad.shape == q.shape
+        assert k.grad is not None and k.grad.shape == k.shape
+
+    run("dense N==0 sum().backward() no crash, zero shapes",
+        lambda: dense_n0_backward(False), allowed_bwd=(0, 1))
+    run("dense N==0 return_attn_probs .sum().backward() no crash, zero shapes",
+        lambda: dense_n0_backward(True), allowed_bwd=(0, 1))
 
     # varlen T_Q == 0
     q = torch.randn(0, 2, 8, dtype=torch.float16, requires_grad=True)
@@ -382,6 +475,15 @@ def test_packed_dense():
     for name, ok in checks:
         (R.ok if ok else R.fail)("packed dense: " + name)
 
+    # Official packed entry points are thin wrappers over flash_attn_func (there is
+    # no fork-only ValueError shape guard).  The unpacked call must receive the
+    # exact same q/k/v slices and options.
+    c_qkv = c
+    flash_attn_func(qkv[:, :, 0], qkv[:, :, 1], qkv[:, :, 2])
+    c_unpacked = last()
+    (R.ok if all(torch.equal(c_qkv[k], c_unpacked[k]) for k in ("q", "k", "v"))
+     else R.fail)("packed dense: qkvpacked == flash_attn_func(q,k,v)")
+
     q = torch.randn(2, 5, 6, 10, dtype=torch.float16)
     kv = torch.randn(2, 5, 2, 2, 10, dtype=torch.float16)
     out = flash_attn_kvpacked_func(q, kv)
@@ -395,16 +497,11 @@ def test_packed_dense():
     for name, ok in checks:
         (R.ok if ok else R.fail)("packed dense: " + name)
 
-    for bad, fn, label in [
-        (torch.randn(2, 5, 4, 3, 10), lambda t: flash_attn_qkvpacked_func(t), "qkvpacked wrong dim 4"),
-        (torch.randn(2, 5, 3, 2, 10), lambda t: flash_attn_kvpacked_func(torch.randn(2, 5, 2, 10), t),
-         "kvpacked wrong dim 3"),
-    ]:
-        try:
-            fn(bad)
-            R.fail("packed dense: " + label, "no exception")
-        except ValueError:
-            R.ok("packed dense: " + label)
+    c_kv = c
+    flash_attn_func(q, kv[:, :, 0], kv[:, :, 1])
+    c_unpacked = last()
+    (R.ok if all(torch.equal(c_kv[k], c_unpacked[k]) for k in ("q", "k", "v"))
+     else R.fail)("packed dense: kvpacked == flash_attn_func(q,k,v)")
 
 
 def test_packed_varlen():
@@ -417,11 +514,19 @@ def test_packed_varlen():
         ("varlen qkvpacked k values", torch.equal(c["k"], qkv[:, 1].contiguous())),
         ("varlen qkvpacked cu_q == cu_k", c["cu_seqlens_q"].tolist() == [0, 4, 10]
          and c["cu_seqlens_k"].tolist() == [0, 4, 10]),
-        ("varlen qkvpacked max_seqlen", c["max_seqlen_q"] == 6 and c["max_seqlen_k"] == 6),
+        ("varlen qkvpacked max_seqlen", c["max_seqlen_q"] >= 6 and c["max_seqlen_k"] >= 6),
         ("varlen qkvpacked output", out.shape == (10, 2, 16)),
     ]
     for name, ok in checks:
         (R.ok if ok else R.fail)("packed varlen: " + name)
+
+    # Official packed entry points delegate to flash_attn_varlen_func; no
+    # fork-only shape guards.  Verify the unpacked call gets the same slices.
+    c_qkv = c
+    flash_attn_varlen_func(qkv[:, 0], qkv[:, 1], qkv[:, 2], cu, cu, 6, 6)
+    c_unpacked = last()
+    (R.ok if all(torch.equal(c_qkv[k], c_unpacked[k]) for k in ("q", "k", "v"))
+     else R.fail)("packed varlen: qkvpacked == flash_attn_varlen_func(q,k,v)")
 
     q = torch.randn(10, 2, 16, dtype=torch.float16)
     kv = torch.randn(10, 2, 2, 16, dtype=torch.float16)
@@ -435,11 +540,11 @@ def test_packed_varlen():
     for name, ok in checks:
         (R.ok if ok else R.fail)("packed varlen: " + name)
 
-    try:
-        flash_attn_varlen_qkvpacked_func(torch.randn(10, 2, 2, 16), cu, 6)
-        R.fail("packed varlen: qkv wrong dim 2", "no exception")
-    except ValueError:
-        R.ok("packed varlen: qkv wrong dim 2")
+    c_kv = c
+    flash_attn_varlen_func(q, kv[:, 0], kv[:, 1], cu, cu, 6, 6)
+    c_unpacked = last()
+    (R.ok if all(torch.equal(c_kv[k], c_unpacked[k]) for k in ("q", "k", "v"))
+     else R.fail)("packed varlen: kvpacked == flash_attn_varlen_func(q,k,v)")
 
 
 # --------------------------------------------------------------------------- kvcache --
@@ -481,11 +586,6 @@ def test_kvcache():
 
 
 if __name__ == "__main__":
-    from flash_attn import (  # noqa: E402
-        flash_attn_func, flash_attn_varlen_func, flash_attn_with_kvcache,
-        flash_attn_qkvpacked_func, flash_attn_kvpacked_func,
-        flash_attn_varlen_qkvpacked_func, flash_attn_varlen_kvpacked_func,
-    )
     print("== interface behavior tests (recording stub backend) ==")
     test_dense_basic()
     test_dense_head_dim_rounding()

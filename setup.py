@@ -12,7 +12,7 @@ try:
 except ImportError:  # `packaging` is not a hard dependency of torch
     def parse(s):
         return tuple(int(x) for x in str(s).split(".") if x.isdigit())
-from setuptools import setup
+from setuptools import find_packages, setup
 from setuptools.command.build_py import build_py
 from torch.utils.cpp_extension import CUDAExtension, BuildExtension
 
@@ -195,7 +195,7 @@ except FileNotFoundError:
 setup(
     name="flash-attn",
     version="2.8.3",
-    packages=["flash_attn"],
+    packages=find_packages(),
     ext_modules=get_ext_modules(),
     cmdclass=get_cmdclass(),
     python_requires=">=3.10",

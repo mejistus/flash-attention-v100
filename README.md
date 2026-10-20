@@ -15,6 +15,11 @@ newer GPUs, with no architecture suffix in the library or API.
   memory drops by **~43 %** (dense) / **~23 %** (packed varlen) while compute stays
   the same or improves slightly. Compared with PyTorch SDPA it trades some speed for
   substantially lower memory (tables below).
+* **Official Python API parity**: the pure-Python layer is upstream flash-attn
+  2.8.3 verbatim (a private V100 adapter). Existing code written for the
+  official package — including `diffusers` and `transformers` FlashAttention-2
+  integrations — runs unchanged. See
+  [PYTHON_API_ALIGNMENT.md](PYTHON_API_ALIGNMENT.md).
 
 ## Install
 
@@ -23,9 +28,9 @@ still **`flash-attn`**; imports are unchanged):
 
 | Wheel | PyTorch | CUDA | sha256 |
 |-------|---------|------|--------|
-| [flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl) | 2.8.0+cu128 | 12.8 | `f0f6d69250db7ec8c5d1ec91c741654b3f5e557178352a59e629eca29d422795` |
-| [flash_attn-2.8.3+cu126.torch2.6.0-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu126.torch2.6.0-cp312-cp312-linux_x86_64.whl) | 2.6.0+cu126 | 12.6 | `861edbaddbaebe7fbd562f8c9526c7b106c9270b93ab29d1d07d4ecb57b5cf83` |
-| [flash_attn-2.8.3+cu124.torch2.5.1-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu124.torch2.5.1-cp312-cp312-linux_x86_64.whl) | 2.5.1+cu124 | 12.4 | `fe5142b19a65f33d49138d6a2f698ea59280bc7c49241636e4a31c54cd9cff54` |
+| [flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3-v100-api/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl) | 2.8.0+cu128 | 12.8 | `628fe534e4d930ee7e1800393ba8ad6b4e5042b914e2a35703942c339542673f` |
+| [flash_attn-2.8.3+cu126.torch2.6.0-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3-v100-api/flash_attn-2.8.3%2Bcu126.torch2.6.0-cp312-cp312-linux_x86_64.whl) | 2.6.0+cu126 | 12.6 | `aa3960b691d13b5c6e84b293d15fcd4c9d951fa35021b9704f35cd66bfa6fea3` |
+| [flash_attn-2.8.3+cu124.torch2.5.1-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3-v100-api/flash_attn-2.8.3%2Bcu124.torch2.5.1-cp312-cp312-linux_x86_64.whl) | 2.5.1+cu124 | 12.4 | `60d727910330c9692fd30ea38df296e93e2121811fd7049a779b3f4fc501f7f4` |
 
 `torch 1.6.0` in the original request is interpreted as a typo for **2.6.0**:
 torch 1.6 (2020) is incompatible with CUDA 12.x, Python 3.12 and the current
@@ -33,11 +38,13 @@ PyTorch extension APIs.
 
 ```bash
 # standard torch 2.8 + CUDA 12.8 environment, for example
-pip install https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
-# sha256: f0f6d69250db7ec8c5d1ec91c741654b3f5e557178352a59e629eca29d422795
+pip install https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3-v100-api/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
+# sha256: 628fe534e4d930ee7e1800393ba8ad6b4e5042b914e2a35703942c339542673f
 ```
 
-Release page: <https://github.com/mejistus/flash-attention-v100/releases/tag/v2.8.3>
+Release page: <https://github.com/mejistus/flash-attention-v100/releases/tag/v2.8.3-v100-api>
+
+The **API-aligned rebuild** is published under the `v2.8.3-v100-api` tag; the original `v2.8.3` assets remain available for the earlier build.
 
 Then, exactly like the official package:
 
@@ -53,6 +60,27 @@ The wheels are ABI-bound to the torch version they were compiled against; pick t
 row matching your PyTorch/CUDA environment. For other torch versions, build from
 source (below); torch extensions are ABI-bound to the torch version they are
 compiled against.
+
+## Python API parity (official 2.8.3)
+
+`flash_attn/flash_attn_interface.py`, `bert_padding.py` and `__init__.py` are
+upstream flash-attn 2.8.3 verbatim; the only private addition is
+`flash_attn/_v100_compat.py`, imported and applied by two lines in `__init__.py`. It adapts only the
+compiled V100 extension (zero-padding unsupported head dimensions, contiguous
+packed views, upstream 128-padded mask/softmax_d shapes); public names,
+signatures, defaults and return layouts are unchanged.
+
+This means the official `_flash_attn_forward/backward` custom ops exist, packed and
+varlen entry points match, and `diffusers` / `transformers` / `torch.compile` see a
+normal official flash-attn 2.8.3 package. Optional upstream Python packages
+(`modules`, `layers`, `ops/triton`, `models`, `utils`, `losses`) are included;
+FA3/CuTe, AMD Triton and blocksparse are excluded. The separate
+`fused_dense_lib`/`dropout_layer_norm` native extensions are optional in upstream
+2.8.3 and are not part of its default wheel either.
+
+See [PYTHON_API_ALIGNMENT.md](PYTHON_API_ALIGNMENT.md) for the exact scope,
+verification (CPU suite 8/8 PASS, parity PASS; diffusers, transformers and
+torch.compile) and limitations.
 
 ## Build from source (V100 / sm_70, verified recipe)
 

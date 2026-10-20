@@ -381,8 +381,8 @@ def bwd(dout, q, k, v, out, lse, dq, dk, dv, alibi_slopes, p_dropout, softmax_sc
 
     Gradients are produced by torch.autograd through the same fp32 reference math
     used by fwd(); leaf grads are quantized to the input dtype exactly like the
-    kernel writes fp16 outputs.  The 4th return (dsoftmax_sum) is not produced
-    because the wrapper never reads it."""
+    kernel writes fp16 outputs.  The 4th return (dsoftmax_sum) is an empty tensor;
+    upstream's wrapper/compat layer reads it even though it is not user-visible."""
     _record("bwd", [dout, q, k, v, out, lse, dq, dk, dv, alibi_slopes, p_dropout,
                     softmax_scale, is_causal, window_left, window_right, softcap,
                     deterministic, gen, rng_state])
@@ -409,7 +409,7 @@ def bwd(dout, q, k, v, out, lse, dq, dk, dv, alibi_slopes, p_dropout, softmax_sc
         dk.copy_(gk)
     if dv is not None:
         dv.copy_(gv)
-    return gq, gk, gv
+    return gq, gk, gv, torch.empty(0, dtype=torch.float32)
 
 
 def varlen_fwd(q, k, v, out, cu_seqlens_q, cu_seqlens_k, seqused_k, leftpad_k,
@@ -497,7 +497,7 @@ def varlen_bwd(dout, q, k, v, out, lse, dq, dk, dv, cu_seqlens_q, cu_seqlens_k,
         dk.copy_(gk)
     if dv is not None:
         dv.copy_(gv)
-    return gq, gk, gv
+    return gq, gk, gv, torch.empty(0, dtype=torch.float32)
 
 
 def fwd_kvcache(q, k_cache, v_cache, k, v, cache_seqlens, rotary_cos, rotary_sin,
