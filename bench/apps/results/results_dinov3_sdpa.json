@@ -1,0 +1,16 @@
+{
+ "mode": "sdpa",
+ "batch": 16,
+ "steps": 30,
+ "lora_rank": 64,
+ "trainable_params": 47442120,
+ "ms_per_step": 393.10182189941406,
+ "samples_per_s": 40.701922780948195,
+ "peak_mib": 13198.6904296875,
+ "loss_first": 5.262990951538086,
+ "loss_last": 3.8297386169433594,
+ "val_acc": 0.734375,
+ "data_prep_s": 67.92928767204285,
+ "torch": "2.8.0+cu128",
+ "device": "Tesla V100S-PCIE-32GB"
+}
