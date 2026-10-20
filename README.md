@@ -6,8 +6,9 @@ compiled extension as **`flash_attn_2_cuda`** — exactly like the official pack
 newer GPUs, with no architecture suffix in the library or API.
 
 * Built and validated on a **Tesla V100S-PCIE-32GB** (sm_70, 32768 MiB) with
-  **torch 2.8.0+cu128** and **CUDA 12.8** (nvcc 12.8.93); the same recipe builds with
-  CUDA 12.6 / torch 2.6.0+cu126.
+  **torch 2.8.0+cu128** and **CUDA 12.8** (nvcc 12.8.93); prebuilt wheels are also
+  published for **CUDA 12.6 / torch 2.6.0+cu126** and **CUDA 12.4 / torch
+  2.5.1+cu124** (table below).
 * Works within a 16 GB budget too (V100 16 GB shares the same sm_70 code path; all
   buffers are sized by the tensors you pass — see the 16 GB note below).
 * Memory-first Pareto profile: vs the previous V100 implementation, training peak
