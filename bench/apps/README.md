@@ -126,3 +126,7 @@ the pipeline is dominated by the MMDiT/VAE layers and text encoders.
   the SDPA/attention call sites directly. This is noted as a drop-in-compatibility gap.
 * TinyImageNet images are 64×64 and are resized to 224×224 by the DINOv3 image
   processor; the benchmark measures compute, not accuracy convergence (30 steps).
+* Multi-version wheels (CUDA 12.8/torch 2.8.0, CUDA 12.6/torch 2.6.0, CUDA
+  12.4/torch 2.5.1) are published on the `v2.8.3` release; see the top-level
+  `README.md` compatibility matrix. The request's `torch 1.6.0` is treated as a
+  typo for **2.6.0** (torch 1.6 cannot run with CUDA 12.x / Python 3.12).

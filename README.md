@@ -17,9 +17,21 @@ newer GPUs, with no architecture suffix in the library or API.
 
 ## Install
 
-From the published wheel (built by this repository):
+Prebuilt wheels for CPython 3.12 / Linux x86_64 / sm_70 (the distribution name is
+still **`flash-attn`**; imports are unchanged):
+
+| Wheel | PyTorch | CUDA | sha256 |
+|-------|---------|------|--------|
+| [flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl) | 2.8.0+cu128 | 12.8 | `f0f6d69250db7ec8c5d1ec91c741654b3f5e557178352a59e629eca29d422795` |
+| [flash_attn-2.8.3+cu126.torch2.6.0-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu126.torch2.6.0-cp312-cp312-linux_x86_64.whl) | 2.6.0+cu126 | 12.6 | `861edbaddbaebe7fbd562f8c9526c7b106c9270b93ab29d1d07d4ecb57b5cf83` |
+| [flash_attn-2.8.3+cu124.torch2.5.1-cp312-cp312-linux_x86_64.whl](https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu124.torch2.5.1-cp312-cp312-linux_x86_64.whl) | 2.5.1+cu124 | 12.4 | `fe5142b19a65f33d49138d6a2f698ea59280bc7c49241636e4a31c54cd9cff54` |
+
+`torch 1.6.0` in the original request is interpreted as a typo for **2.6.0**:
+torch 1.6 (2020) is incompatible with CUDA 12.x, Python 3.12 and the current
+PyTorch extension APIs.
 
 ```bash
+# standard torch 2.8 + CUDA 12.8 environment, for example
 pip install https://github.com/mejistus/flash-attention-v100/releases/download/v2.8.3/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl
 # sha256: f0f6d69250db7ec8c5d1ec91c741654b3f5e557178352a59e629eca29d422795
 ```
@@ -36,9 +48,10 @@ print(flash_attn.__version__)       # 2.8.3
 print(flash_attn_2_cuda.fwd)        # extension function
 ```
 
-The wheel targets CPython 3.12 + torch 2.8 (cu128) on sm_70. For other torch
-versions, build from source (below); torch extensions are ABI-bound to the torch
-version they are compiled against.
+The wheels are ABI-bound to the torch version they were compiled against; pick the
+row matching your PyTorch/CUDA environment. For other torch versions, build from
+source (below); torch extensions are ABI-bound to the torch version they are
+compiled against.
 
 ## Build from source (V100 / sm_70, verified recipe)
 
@@ -136,6 +149,23 @@ mem-efficient kernels are faster on V100, but they need KV-head expansion for GQ
 (extra memory) and have no packed-varlen path. This build uses **40–50 % less memory**
 than SDPA for GQA/varlen training, with full GQA and varlen support. Use SDPA only if
 raw speed matters more than memory on an MHA workload.
+
+## Real applications on V100
+
+Two complete application benchmarks live in [`bench/apps/`](bench/apps/README.md):
+DINOv3-H LoRA (rank 64) fine-tuning on TinyImageNet-200 and SD3.5-Medium
+text-to-image generation. Each has an SDPA baseline and a `flash_attn` variant with
+identical hyper-parameters, run on the same V100S-32GB / torch 2.8.0+cu128 setup:
+
+| workload | PyTorch SDPA | this build | difference |
+|----------|-------------:|-----------:|-----------:|
+| DINOv3-H LoRA(64), 224 px, batch 16 | 393.1 ms/step, 13.2 GiB | 393.7 ms/step, 13.2 GiB | +0.16 % |
+| SD3.5-Medium, 512×512, 20 steps | 2764.6 ms/image, 17.7 GiB | 2994.4 ms/image, 17.7 GiB | +8.31 % |
+
+At these short-sequence / inference workloads attention is not the bottleneck; the
+repo's advantage is memory at large batch/sequence (table above). The two generated
+images are visually equivalent (PSNR 42.46 dB). Scripts, logs, JSON results and the
+PNG outputs are committed under `bench/apps/`.
 
 ## Verification
 
