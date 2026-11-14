@@ -40,16 +40,10 @@ echo "MAX_JOBS=$MAX_JOBS NVCC_THREADS=$NVCC_THREADS"
 cd "$REPO_DIR"
 if [[ "${1:-}" == "--wheel" ]]; then
     uv build --wheel --no-build-isolation --out-dir dist .
-    # The wheel cannot carry a second .dist-info (PEP 427); drop the upstream
-    # metadata next to the wheel so consumers can install it explicitly:
-    #   python flash_attn/_upstream_metadata.py --dest <site-packages>
-    "$ENV_PREFIX/bin/python" "$REPO_DIR/flash_attn/_upstream_metadata.py" --dest dist
+    echo "wheel written to $REPO_DIR/dist"
 else
+    # The distribution is named `flash-attn` and ships `flash_attn` +
+    # `flash_attn_2_cuda`, so the wheel carries the official `flash_attn-2.8.3.dist-info`
+    # itself; no post-install metadata step is needed.
     uv pip install --python "$ENV_PREFIX/bin/python" --no-build-isolation --no-deps "$@" .
-    # PEP 427 allows exactly one .dist-info per wheel (uv rejects two with "Multiple
-    # .dist-info directories found"), so the upstream flash_attn-2.8.3 metadata is
-    # materialised into site-packages right after the install (research/07 F-5).
-    # Run as a plain script path so the package __init__ / CUDA extension is not imported.
-    "$ENV_PREFIX/bin/python" "$REPO_DIR/flash_attn/_upstream_metadata.py"
-    "$ENV_PREFIX/bin/python" -m flash_attn._upstream_metadata --check
 fi

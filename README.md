@@ -78,6 +78,13 @@ FA3/CuTe, AMD Triton and blocksparse are excluded. The separate
 `fused_dense_lib`/`dropout_layer_norm` native extensions are optional in upstream
 2.8.3 and are not part of its default wheel either.
 
+`tests/test_diffusers_compat.py` pins the exact import path diffusers uses
+(`from flash_attn.flash_attn_interface import _wrapped_flash_attn_forward,
+_wrapped_flash_attn_backward`) and, on a V100, replays diffusers' forward/backward
+call sequence against an fp32 SDPA reference. Missing those names is what makes
+diffusers log `flash_attn is installed but failed to import` and silently fall
+back to native PyTorch attention.
+
 See [PYTHON_API_ALIGNMENT.md](PYTHON_API_ALIGNMENT.md) for the exact scope,
 verification (CPU suite 8/8 PASS, parity PASS; diffusers, transformers and
 torch.compile) and limitations.

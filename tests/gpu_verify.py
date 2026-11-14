@@ -259,21 +259,20 @@ def test_backward(flash_attn_func, flash_attn_varlen_func, D, M, H, Hk, causal=T
             o = fn(qq, kk, vv)
             w = torch.randn_like(o)
             (o.float() * w.float()).sum().backward()
-            return o.detach(), qq.grad, kk.grad, vv.grad
+            return o.detach(), qq.grad, kk.grad, vv.grad, w
 
-        o1, dq1, dk1, dv1 = run(lambda a, b, c: flash_attn_func(a, b, c, dropout_p=dropout, causal=causal))
+        o1, dq1, dk1, dv1, w = run(lambda a, b, c: flash_attn_func(a, b, c, dropout_p=dropout, causal=causal))
 
         q2 = q.clone().requires_grad_(True)
         k2 = k.clone().requires_grad_(True)
         v2 = v.clone().requires_grad_(True)
         if dropout == 0.0:
             ref, _ = reference_attention(q2, k2, v2, causal=causal)
-            w = torch.randn_like(ref)
+            # Reuse the *same* upstream gradient `w` as the flash run; drawing a
+            # fresh tensor here would compare gradients of different losses.
             (ref.float() * w.float()).sum().backward()
         else:
             # with dropout we only check shapes / finiteness
-            w = torch.randn_like(o1)
-            (o1.float() * w.float()).sum().backward()
             for nm, t in (("dq", dq1), ("dk", dk1), ("dv", dv1)):
                 R.result(f"bwd dropout D={D} {nm} finite", bool(t.isfinite().all()))
             continue
